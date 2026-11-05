@@ -2,7 +2,6 @@ name: PixelEngine Release
 
 on:
   push:
-    branches: [main]
     tags:
       - "v*"
   workflow_dispatch:
@@ -14,7 +13,6 @@ env:
   DOTNET_NOLOGO: "1"
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
-  HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
 
 jobs:
   build-test-package:
@@ -90,8 +88,6 @@ jobs:
 
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $version = $env:GITHUB_REF_NAME
-          } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:HEAD_COMMIT_MESSAGE -eq 'release: v2.0.0-preview.1') {
-            $version = 'v2.0.0-preview.1'
           } else {
             $version = 'preview-' + $env:GITHUB_SHA.Substring(0, 7)
           }
@@ -120,15 +116,15 @@ jobs:
           retention-days: 30
 
       - name: Publish GitHub Release
-        if: "startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.head_commit.message == 'release: v2.0.0-preview.1')"
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.package.outputs.version }}
           target_commitish: ${{ github.sha }}
           name: PixelEngine ${{ steps.package.outputs.version }}
           body_path: RELEASE-NOTES-v2.0.0-preview.1.md
-          prerelease: true
-          make_latest: false
+          prerelease: ${{ contains(steps.package.outputs.version, '-') }}
+          make_latest: ${{ !contains(steps.package.outputs.version, '-') }}
           files: |
             ${{ steps.package.outputs.zip_path }}
             ${{ steps.package.outputs.checksum_path }}
