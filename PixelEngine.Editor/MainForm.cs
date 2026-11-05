@@ -55,6 +55,7 @@ public sealed class MainForm : Form
     private int _lastWorkerLogRepeatCount;
     private DateTime _lastWorkerLogAt;
     private bool _refreshingOutput;
+    private StatusStrip? _statusStrip;
     private readonly ToolStripStatusLabel _status = new() { Spring = true, TextAlign = ContentAlignment.MiddleRight, Text = "Ready" };
     private ToolStripButton? _undoButton;
     private ToolStripButton? _redoButton;
@@ -145,6 +146,7 @@ public sealed class MainForm : Form
             Padding = new Padding(Theme.Px(10), 0, Theme.Px(6), 0),
             Font = Theme.Body(Theme.FontSmall)
         };
+        _statusStrip = status;
         status.Renderer = StudioToolStripStyle.CreateRenderer();
         status.Items.Add(new ToolStripStatusLabel("● PixelEngine Studio")
         {
@@ -302,8 +304,13 @@ public sealed class MainForm : Form
                 _autoCollapsedBottom = false;
                 _rootSplit.Panel2Collapsed = false;
             }
-            var available = _status.Owner?.Width ?? width;
-            if (_status is not null) _status.Width = Math.Max(Theme.Px(180), Math.Min(Theme.Px(460), available / 3));
+            // Status text is the first thing to be clipped when the window narrows, so it is
+            // bounded by the real status strip width and stops growing on very wide monitors.
+            var available = _statusStrip is { IsDisposed: false, Width: > 0 } strip ? strip.Width : width;
+            _status.Width = Math.Max(Theme.Px(120), Math.Min(Theme.Px(420), available * 2 / 5));
+            // Keep the custom dock proportions sane after the collapse decisions above; saved
+            // layouts are preserved, only out-of-range distances are repaired.
+            ClampSplitDistances();
         }
         catch (InvalidOperationException) { /* The window is closing while the split containers detach. */ }
     }
@@ -664,6 +671,34 @@ public sealed class MainForm : Form
         var inspectorWidth = Math.Clamp((int)(_centerSplit.Width * .235), 275, 360);
         SetSplitDistance(_centerSplit, _centerSplit.Width - inspectorWidth - _centerSplit.SplitterWidth);
         SetSplitDistance(_leftDockSplit, (int)(_leftDockSplit.Height * .53));
+    }
+
+    /// <summary>
+    /// Repairs splitter distances that would clip a panel after a resize or a DPI change. The saved
+    /// user layout is only adjusted when it is physically impossible to honour.
+    /// </summary>
+    private void ClampSplitDistances()
+    {
+        ClampSplit(_rootSplit, horizontal: false, minimumPanel1: Theme.Px(220), minimumPanel2: Theme.Px(120));
+        ClampSplit(_sideSplit, horizontal: true, minimumPanel1: Theme.Px(180), minimumPanel2: Theme.Px(260));
+        ClampSplit(_centerSplit, horizontal: true, minimumPanel1: Theme.Px(320), minimumPanel2: Theme.Px(220));
+        ClampSplit(_leftDockSplit, horizontal: false, minimumPanel1: Theme.Px(120), minimumPanel2: Theme.Px(140));
+    }
+
+    private static void ClampSplit(SplitContainer split, bool horizontal, int minimumPanel1, int minimumPanel2)
+    {
+        try
+        {
+            if (split.IsDisposed || split.Panel1Collapsed || split.Panel2Collapsed) return;
+            var extent = horizontal ? split.Width : split.Height;
+            var maximum = extent - minimumPanel2 - split.SplitterWidth;
+            if (maximum <= minimumPanel1) return; // The dock is narrower than both minimums: leave it alone.
+            var current = split.SplitterDistance;
+            if (current < minimumPanel1) split.SplitterDistance = minimumPanel1;
+            else if (current > maximum) split.SplitterDistance = maximum;
+        }
+        catch (ArgumentOutOfRangeException) { /* The container is mid-relayout; the next resize retries. */ }
+        catch (InvalidOperationException) { }
     }
 
     private static string DockLayoutFile =>
