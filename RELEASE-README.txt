@@ -14,6 +14,7 @@ PACKAGE
 - PixelEngine.Editor.exe — Windows Studio editor.
 - PixelEngine.Sandbox.exe — self-contained MonoGame Player.
 - Lic\ — sample projects and LIC fixtures.
+- Website\ — complete static site (HTML, CSS, favicon, sitemap and robots.txt).
 - README.md — project overview, source-build instructions and current limitations.
 - RELEASE-NOTES.md — changes and known limitations for this preview.
 
