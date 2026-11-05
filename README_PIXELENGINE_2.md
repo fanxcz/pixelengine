@@ -184,6 +184,19 @@ Stage 9 connects several previously authoring-only component settings to the run
 
 See `PIXELENGINE_2_STAGE_10.md` for implementation details, the Stage 10 showcase, performance limits and remaining renderer/editor work. Run `verify-stage10.ps1` on Windows with the .NET 8 SDK to perform static checks, Release/Debug builds and smoke tests.
 
+## Stage 13 — Studio UI overhaul, real terminal, persisted preferences
+
+Stage 13 rebuilds the Studio look on a single design-token file (`PixelEngine.Editor/Presentation/Theme.cs`,
+`#0B0D12` background, `#141821` panels, `#6E8BFF`/`#9B7CFF` accents), adds a responsive dock layout that
+collapses the Inspector/Explorer/Bottom Dock instead of clipping, converts every panel and the Studio
+Tools window to DPI-aware sizing, and ships a **real** PowerShell/CMD terminal that executes commands,
+reads stdout and stderr and reports true exit codes without blocking the UI thread. Preferences
+(general, terminal, script font, scene grid, recent projects) are now persisted to
+`%LOCALAPPDATA%\PixelEngine\EditorSettings.json` and editable through `Tools → Preferences…` (Ctrl+,).
+A headless `PixelEngine.Editor.Tests` project covers settings, layout serialization and MSBuild
+diagnostic parsing and runs in CI. Full details and the honest verification scope are in
+[`PIXELENGINE_2_STAGE_13.md`](PIXELENGINE_2_STAGE_13.md).
+
 ## Stage 11 — Core Stability & QA
 
 The current Stage 11 reliability pass adds read-only runtime scene graph views, finite transform/time guards, bounded LIC/asset I/O, hardened profiler telemetry and a Windows CI/build gate. See [`PIXELENGINE_2_STAGE_11.md`](PIXELENGINE_2_STAGE_11.md) and run `verify-stage11.ps1` from PowerShell to restore, build Debug/Release and execute smoke tests.
