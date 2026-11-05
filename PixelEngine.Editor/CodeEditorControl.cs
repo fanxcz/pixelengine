@@ -74,6 +74,15 @@ internal sealed class CodeEditorControl : UserControl
         _editor.Focus();
     }
 
+    /// <summary>Applies persisted preferences (font size and word wrap).</summary>
+    public void ApplyPreferences(float fontSize, bool wordWrap)
+    {
+        var size = float.IsFinite(fontSize) ? Math.Clamp(fontSize, 7f, 32f) : 10f;
+        _editor.Font = Theme.Mono(size);
+        _editor.WordWrap = wordWrap;
+        _gutter.Invalidate();
+    }
+
     public bool EditorReadOnly
     {
         get => _editor.ReadOnly;

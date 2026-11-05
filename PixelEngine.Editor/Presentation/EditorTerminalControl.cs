@@ -19,8 +19,8 @@ internal sealed class EditorTerminalControl : UserControl
         public int RepeatCount { get; set; } = 1;
     }
 
-    private const int MaximumBufferedLines = 6000;
-    private const int TrimToLines = 4500;
+    private int _maximumLines = 6000;
+    private int _trimToLines = 4500;
 
     private readonly RichTextBox _output = new()
     {
@@ -155,6 +155,23 @@ internal sealed class EditorTerminalControl : UserControl
     }
 
     private TerminalSession ActiveSession => _sessions.TryGetValue(_activeShell, out var session) ? session : null!;
+
+    /// <summary>Applies persisted preferences (font size, scrollback, default shell).</summary>
+    public void ApplyPreferences(float fontSize, int scrollback, TerminalShell defaultShell)
+    {
+        var size = float.IsFinite(fontSize) ? Math.Clamp(fontSize, 7f, 24f) : 9.5f;
+        _output.Font = Theme.Mono(size);
+        _command.Font = Theme.Mono(size);
+        _maximumLines = Math.Clamp(scrollback, 500, 50_000);
+        _trimToLines = Math.Max(250, _maximumLines * 3 / 4);
+        if (_sessions.Count == 0 && _activeShell != defaultShell)
+        {
+            _activeShell = defaultShell;
+            _shellSelector.SelectedIndex = defaultShell == TerminalShell.Cmd ? 1 : 0;
+            _promptLabel.Text = defaultShell == TerminalShell.PowerShell ? "PS" : ">";
+            UpdateState();
+        }
+    }
 
     public void FocusCommandInput()
     {
@@ -372,7 +389,7 @@ internal sealed class EditorTerminalControl : UserControl
         try
         {
             foreach (var (text, isError) in batch) AppendLineCore(text, isError, LineStyle.Plain);
-            if (_lines.Count > MaximumBufferedLines) TrimTranscript();
+            if (_lines.Count > _maximumLines) TrimTranscript();
             if (atBottom) ScrollToEnd();
         }
         finally
@@ -389,7 +406,7 @@ internal sealed class EditorTerminalControl : UserControl
     /// </summary>
     private void TrimTranscript()
     {
-        var remove = _lines.Count - TrimToLines;
+        var remove = _lines.Count - _trimToLines;
         if (remove <= 0) return;
         var builder = new StringBuilder();
         for (var i = 0; i < remove; i++)
@@ -479,7 +496,7 @@ internal sealed class EditorTerminalControl : UserControl
             }
         }
         _lines.Add(new TerminalLine(clean, isError, Repeats: false));
-        if (_lines.Count > MaximumBufferedLines) TrimTranscript();
+        if (_lines.Count > _maximumLines) TrimTranscript();
         var color = isError ? Theme.Danger
             : style == LineStyle.Info ? Theme.Muted
             : style == LineStyle.Prompt ? Theme.AccentBright

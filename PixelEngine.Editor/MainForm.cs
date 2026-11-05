@@ -92,6 +92,8 @@ public sealed class MainForm : Form
     private ToolStripStatusLabel? _selectionStatus;
     private Label? _gamePreviewBadge;
     private ListBox? _gamePlayerLog;
+    private readonly EditorSettings _settings;
+    private ToolStripMenuItem? _recentProjectsMenu;
 
     public MainForm(string? initialProject)
     {
@@ -110,8 +112,13 @@ public sealed class MainForm : Form
         MinimumSize = new Size(Theme.Px(1000), Theme.Px(620));
         Size = new Size(Theme.Px(1580), Theme.Px(980));
         StartPosition = FormStartPosition.CenterScreen;
+        // Preferences are loaded before the shell so toolbars, the terminal and the scene view
+        // start with the user's saved state instead of being patched afterwards.
+        _settings = EditorSettings.Load(out var settingsWarning);
+        ApplySettingsToControls();
 
         BuildShell();
+        if (settingsWarning is not null) Log(settingsWarning);
         WireEvents();
         if (!string.IsNullOrWhiteSpace(initialProject) && File.Exists(initialProject)) OpenProject(initialProject);
         else OpenRecentDefault();
@@ -243,6 +250,7 @@ public sealed class MainForm : Form
             StudioControlStyler.Style(this);
             ApplyResponsiveLayout();
             UpdateWindowTitle();
+            RefreshRecentProjectsMenu();
         };
         DpiChanged += (_, e) => OnDpiChanged();
         Resize += (_, _) => ApplyResponsiveLayout();
@@ -791,6 +799,8 @@ public sealed class MainForm : Form
         var file = new ToolStripMenuItem("File");
         file.DropDownItems.Add(MenuItem("New Project", Keys.Control | Keys.N, (_, _) => NewProject()));
         file.DropDownItems.Add(MenuItem("Open .lic…", Keys.Control | Keys.O, (_, _) => OpenDialog()));
+        _recentProjectsMenu = new ToolStripMenuItem("Recent Projects");
+        file.DropDownItems.Add(_recentProjectsMenu);
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(MenuItem("Save", Keys.Control | Keys.S, (_, _) => SaveProject()));
         file.DropDownItems.Add(MenuItem("Save As…", Keys.Control | Keys.Shift | Keys.S, (_, _) => SaveProjectAs()));
@@ -875,6 +885,8 @@ public sealed class MainForm : Form
         project.DropDownItems.Add(MenuItem("Build Solution", Keys.None, (_, _) => BuildSolution()));
 
         var tools = new ToolStripMenuItem("Tools");
+        tools.DropDownItems.Add(MenuItem("Preferences…", Keys.Control | Keys.Oemcomma, (_, _) => ShowPreferences()));
+        tools.DropDownItems.Add(new ToolStripSeparator());
         tools.DropDownItems.Add(MenuItem("Diagnostics & Stage 8 Tools…", Keys.Control | Keys.F8, (_, _) => OpenStage8Tools()));
         tools.DropDownItems.Add(MenuItem("Run Project Diagnostics", Keys.None, (_, _) => RunProjectDiagnostics()));
         tools.DropDownItems.Add(MenuItem("Build Editor", Keys.None, (_, _) => RunEditorBuild()));
@@ -888,6 +900,122 @@ public sealed class MainForm : Form
         help.DropDownItems.Add(MenuItem("Keyboard Shortcuts", Keys.None, (_, _) => ShowShortcuts()));
         menu.Items.AddRange([file, edit, node, scenes, view, window, project, tools, help]);
         return menu;
+    }
+
+    // ── Settings ────────────────────────────────────────────────────────────────
+
+    /// <summary>Pushes saved preferences into controls that already exist.</summary>
+    private void ApplySettingsToControls()
+    {
+        _sceneCanvas.GridSize = _settings.SceneGridSize;
+        _sceneCanvas.SnapToGrid = _settings.SceneSnap;
+        _sceneCanvas.ShowGrid = _settings.SceneShowGrid;
+        _sceneCanvas.ShowColliders = _settings.SceneShowColliders;
+        _sceneCanvas.ShowObjectLabels = _settings.SceneShowLabels;
+        _terminal.ApplyPreferences(_settings.TerminalFontSize, _settings.TerminalScrollback,
+            _settings.DefaultShell == "Command Prompt" ? TerminalShell.Cmd : TerminalShell.PowerShell);
+        _codeEditor.ApplyPreferences(_settings.ScriptFontSize, _settings.ScriptWordWrap);
+        _output.IntegralHeight = false;
+    }
+
+    private void ShowPreferences()
+    {
+        var updated = EditorPreferencesDialog.Pick(this, _settings);
+        if (updated is null)
+        {
+            SetStatus("Preferences unchanged");
+            return;
+        }
+        CopySettings(updated, _settings);
+        ApplySettingsToControls();
+        SyncSceneToolbarFromSettings();
+        if (!_settings.TrySave(out var error))
+        {
+            MessageBox.Show(this, $"Preferences could not be written to disk.\n\n{error}", "Preferences",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Log("Preferences could not be saved: " + error);
+        }
+        else Log("Preferences saved.");
+        SetStatus("Preferences saved · terminal shell applies to new sessions");
+    }
+
+    /// <summary>Copies the edited working copy back into the live settings instance.</summary>
+    private static void CopySettings(EditorSettings from, EditorSettings to)
+    {
+        to.AutoCheckScripts = from.AutoCheckScripts;
+        to.SaveBeforeRun = from.SaveBeforeRun;
+        to.ConfirmDiscardChanges = from.ConfirmDiscardChanges;
+        to.GroupRepeatedLogs = from.GroupRepeatedLogs;
+        to.MaxOutputEntries = from.MaxOutputEntries;
+        to.DefaultShell = from.DefaultShell;
+        to.TerminalFontSize = from.TerminalFontSize;
+        to.TerminalScrollback = from.TerminalScrollback;
+        to.ScriptFontSize = from.ScriptFontSize;
+        to.ScriptWordWrap = from.ScriptWordWrap;
+        to.SceneGridSize = from.SceneGridSize;
+        to.SceneSnap = from.SceneSnap;
+        to.SceneShowGrid = from.SceneShowGrid;
+        to.SceneShowColliders = from.SceneShowColliders;
+        to.SceneShowLabels = from.SceneShowLabels;
+        to.Normalize();
+    }
+
+    /// <summary>Reflects scene-view defaults back into the Scene toolbar toggles.</summary>
+    private void SyncSceneToolbarFromSettings()
+    {
+        _sceneCanvas.Invalidate();
+        SetStatus("Scene view defaults applied");
+    }
+
+    private void PersistSettings()
+    {
+        _settings.SceneGridSize = _sceneCanvas.GridSize;
+        _settings.SceneSnap = _sceneCanvas.SnapToGrid;
+        _settings.SceneShowGrid = _sceneCanvas.ShowGrid;
+        _settings.SceneShowColliders = _sceneCanvas.ShowColliders;
+        _settings.SceneShowLabels = _sceneCanvas.ShowObjectLabels;
+        if (_settings.TrySave(out var error)) return;
+        Log("Editor settings could not be saved: " + error);
+    }
+
+    private void RememberProject(string? path)
+    {
+        _settings.RememberProject(path);
+        _settings.TrySave(out _);
+        RefreshRecentProjectsMenu();
+    }
+
+    private void RefreshRecentProjectsMenu()
+    {
+        if (_recentProjectsMenu is null) return;
+        _recentProjectsMenu.DropDownItems.Clear();
+        var recent = _settings.ExistingRecentProjects().Take(10).ToArray();
+        if (recent.Length == 0)
+        {
+            _recentProjectsMenu.DropDownItems.Add(new ToolStripMenuItem("No recent projects") { Enabled = false });
+            return;
+        }
+        foreach (var path in recent)
+        {
+            var item = new ToolStripMenuItem(Path.GetFileName(path))
+            {
+                ToolTipText = path,
+                Tag = path
+            };
+            item.Click += (_, _) =>
+            {
+                if (!ConfirmPendingChanges("open another project")) return;
+                OpenProject((string)item.Tag);
+            };
+            _recentProjectsMenu.DropDownItems.Add(item);
+        }
+        _recentProjectsMenu.DropDownItems.Add(new ToolStripSeparator());
+        _recentProjectsMenu.DropDownItems.Add("Clear list", null, (_, _) =>
+        {
+            _settings.RecentProjects.Clear();
+            _settings.TrySave(out _);
+            RefreshRecentProjectsMenu();
+        });
     }
 
     private static string StartupLogPath =>
@@ -1075,18 +1203,25 @@ public sealed class MainForm : Form
             _sceneCanvas.Invalidate();
         };
         form.ShowDialog(this);
-        if (changed)
+        if (!changed) return;
+        _isDirty = true;
+        UpdateWindowTitle();
+        var answer = MessageBox.Show(this,
+            "Authoring data changed (animation clips, lights, particle emitters or tile maps).\n\nSave the project now?",
+            "Stage 8 tools", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+        if (answer == DialogResult.Cancel)
         {
-            if (TrySaveProject())
-            {
-                RefreshProjectView();
-                Log("Stage 8 authoring data saved.");
-            }
-            else
-            {
-                Log("Stage 8 authoring changes remain unsaved; use File → Save.");
-            }
+            Log("Authoring changes kept in memory; use File → Save when ready.");
+            RefreshProjectView();
+            return;
         }
+        if (answer == DialogResult.Yes && TrySaveProject())
+        {
+            Log("Authoring data saved to " + (_projectPath ?? "project") + ".");
+            SetStatus("Authoring data saved");
+        }
+        else Log("Authoring data changed but not saved; use File → Save.");
+        RefreshProjectView();
     }
 
     private void RunProjectDiagnostics()
@@ -1371,18 +1506,20 @@ public sealed class MainForm : Form
             Margin = new Padding(2, 1, 2, 1),
             Padding = new Padding(6, 3, 6, 3)
         };
-        snap.CheckedChanged += (_, _) => _sceneCanvas.SnapToGrid = snap.Checked;
+        snap.Checked = _sceneCanvas.SnapToGrid;
+        snap.CheckedChanged += (_, _) => { _sceneCanvas.SnapToGrid = snap.Checked; SetStatus(snap.Checked ? "Snapping on" : "Snapping off"); };
         toolbar.Items.Add(snap);
         var gridSize = new ToolStripComboBox
         {
             AutoSize = false,
-            Width = 66,
+            Width = Theme.Px(70),
             DropDownStyle = ComboBoxStyle.DropDownList,
             ToolTipText = "Grid snap size",
-            Margin = new Padding(2, 1, 5, 1)
+            Margin = new Padding(Theme.Px(2), Theme.Px(1), Theme.Px(5), Theme.Px(1))
         };
         gridSize.Items.AddRange(["4", "8", "16", "32", "64"]);
-        gridSize.SelectedItem = "16";
+        var savedGrid = _sceneCanvas.GridSize.ToString("0");
+        gridSize.SelectedItem = gridSize.Items.Contains(savedGrid) ? savedGrid : "16";
         gridSize.SelectedIndexChanged += (_, _) =>
         {
             if (float.TryParse(gridSize.SelectedItem?.ToString(), out var size))
@@ -1395,13 +1532,13 @@ public sealed class MainForm : Form
 
         toolbar.Items.Add(new ToolStripSeparator { Margin = new Padding(6, 3, 6, 3) });
         AddToolbarGroupLabel(toolbar, "OVERLAYS");
-        var showGrid = new ToolStripButton("Grid") { ForeColor = Theme.Text, CheckOnClick = true, Checked = true, ToolTipText = "Show scene grid", Padding = new Padding(6, 3, 6, 3) };
+        var showGrid = new ToolStripButton("Grid") { ForeColor = Theme.Text, CheckOnClick = true, Checked = _sceneCanvas.ShowGrid, ToolTipText = "Show scene grid", Padding = new Padding(Theme.Px(6), Theme.Px(3), Theme.Px(6), Theme.Px(3)) };
         showGrid.CheckedChanged += (_, _) => { _sceneCanvas.ShowGrid = showGrid.Checked; _sceneCanvas.Invalidate(); };
         toolbar.Items.Add(showGrid);
-        var labels = new ToolStripButton("Labels") { ForeColor = Theme.Text, CheckOnClick = true, Checked = false, ToolTipText = "Show object labels", Padding = new Padding(6, 3, 6, 3) };
+        var labels = new ToolStripButton("Labels") { ForeColor = Theme.Text, CheckOnClick = true, Checked = _sceneCanvas.ShowObjectLabels, ToolTipText = "Show object labels", Padding = new Padding(Theme.Px(6), Theme.Px(3), Theme.Px(6), Theme.Px(3)) };
         labels.CheckedChanged += (_, _) => { _sceneCanvas.ShowObjectLabels = labels.Checked; _sceneCanvas.Invalidate(); };
         toolbar.Items.Add(labels);
-        var colliders = new ToolStripButton("Colliders") { ForeColor = Theme.Text, CheckOnClick = true, Checked = true, ToolTipText = "Show collider shapes", Padding = new Padding(6, 3, 6, 3) };
+        var colliders = new ToolStripButton("Colliders") { ForeColor = Theme.Text, CheckOnClick = true, Checked = _sceneCanvas.ShowColliders, ToolTipText = "Show collider shapes", Padding = new Padding(Theme.Px(6), Theme.Px(3), Theme.Px(6), Theme.Px(3)) };
         colliders.CheckedChanged += (_, _) => { _sceneCanvas.ShowColliders = colliders.Checked; _sceneCanvas.Invalidate(); };
         toolbar.Items.Add(colliders);
         toolbar.Items.Add(new ToolStripSeparator { Margin = new Padding(6, 3, 6, 3) });
@@ -2082,10 +2219,18 @@ public sealed class MainForm : Form
 
     private void OpenRecentDefault()
     {
+        // Prefer the most recent project that still exists, then fall back to the demo project.
+        var recent = _settings.ExistingRecentProjects().FirstOrDefault();
+        if (recent is not null)
+        {
+            OpenProject(recent);
+            Log("Reopened most recent project: " + recent);
+            return;
+        }
         var root = FindRepositoryRoot();
         var candidate = root is null ? null : Path.Combine(root, "Lic", "demo.lic");
         if (candidate is not null && File.Exists(candidate)) OpenProject(candidate);
-        else Log("Open a project using File → Open .lic.");
+        else Log("Open a project using File → Open .lic (Ctrl+O).");
     }
 
     private void NewProject()
@@ -2113,9 +2258,15 @@ public sealed class MainForm : Form
 
     private void OpenDialog()
     {
-        using var dialog = new OpenFileDialog { Filter = "PixelEngine projects (*.lic)|*.lic|JSON files (*.json)|*.json|All files (*.*)|*.*", Title = "Open PixelEngine project" };
-        if (dialog.ShowDialog(this) == DialogResult.OK && ConfirmPendingChanges("open another project"))
-            OpenProject(dialog.FileName);
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "PixelEngine projects (*.lic)|*.lic|JSON files (*.json)|*.json|All files (*.*)|*.*",
+            Title = "Open PixelEngine project"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        // Ask about unsaved work *before* replacing the project so Cancel really cancels.
+        if (!ConfirmPendingChanges("open another project")) return;
+        OpenProject(dialog.FileName);
     }
 
     private void OpenProject(string path)
@@ -2131,11 +2282,14 @@ public sealed class MainForm : Form
             RefreshProjectView(resetActiveScene: true);
             var objectCount = _project.Scenes.Sum(x => x.Objects.Count);
             Log($"Loaded {_project.Name}: {_project.Scenes.Count} scene(s), {objectCount} object(s), {_project.Scripts.Count} script(s), {_project.Assets.Count} asset(s), {_project.Prefabs.Count} prefab(s).");
-            foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "lua", StringComparison.OrdinalIgnoreCase)))
-            {
-                var error = LicLuaBehaviour.ValidateCode(script.Code);
-                if (!string.IsNullOrEmpty(error)) Log($"Lua syntax error in {script.Name}: {error}");
-            }
+            RememberProject(_projectPath);
+            if (_settings.AutoCheckScripts) CheckScripts(silentWhenClean: true);
+            else
+                foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "lua", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var error = LicLuaBehaviour.ValidateCode(script.Code);
+                    if (!string.IsNullOrEmpty(error)) Log($"Lua syntax error in {script.Name}: {error}");
+                }
         }
         catch (Exception ex)
         {
@@ -2204,6 +2358,7 @@ public sealed class MainForm : Form
     private bool ConfirmPendingChanges(string action)
     {
         if (!_isDirty || _project is null) return true;
+        if (!_settings.ConfirmDiscardChanges) return TrySaveProject();
         var result = MessageBox.Show(this,
             $"Save changes to '{_project.Name}' before you {action}?",
             "Unsaved changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
@@ -2946,7 +3101,7 @@ public sealed class MainForm : Form
         return null;
     }
 
-    private void CheckScripts()
+    private void CheckScripts(bool silentWhenClean = false)
     {
         if (_project is null) return;
         var luaScripts = _project.Scripts.Where(x => string.Equals(x.Language, "lua", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -2963,15 +3118,36 @@ public sealed class MainForm : Form
             }
             if (ReferenceEquals(script, _selectedScript) && string.IsNullOrEmpty(error)) _codeEditor.SetDiagnostic(null);
         }
-        foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "csharp", StringComparison.OrdinalIgnoreCase)))
-            Log($"C# source retained but not executed: {script.Name}");
-        Log($"Lua check complete: {luaScripts.Length - errors}/{luaScripts.Length} passed.");
+        if (!silentWhenClean || errors > 0)
+        {
+            foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "csharp", StringComparison.OrdinalIgnoreCase)))
+                Log($"C# source retained but not executed: {script.Name}");
+            Log($"Lua check complete: {luaScripts.Length - errors}/{luaScripts.Length} passed.");
+        }
+        SetStatus(errors == 0
+            ? $"Lua check: {luaScripts.Length} script(s) OK"
+            : $"Lua check: {errors} error(s) in {luaScripts.Length} script(s)");
+        if (errors > 0) OpenBottomTab(0);
     }
 
     private void RunPreview()
     {
-        if (_project is null) return;
-        if (!TrySaveProject())
+        if (_project is null)
+        {
+            SetStatus("Open or create a project before running the player.");
+            return;
+        }
+        if (!_settings.SaveBeforeRun)
+        {
+            if (string.IsNullOrWhiteSpace(_projectPath) || !File.Exists(_projectPath))
+            {
+                MessageBox.Show(this,
+                    "The player runs from a saved .lic file. Save the project (Ctrl+S) before launching, or enable \"Save before launching\" in Tools → Preferences.",
+                    "Project not saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+        }
+        else if (!TrySaveProject())
         {
             SetStatus("Preview cancelled because the project was not saved.");
             return;
@@ -3345,6 +3521,11 @@ public sealed class MainForm : Form
 
     private void AddWorkerLog(string message)
     {
+        if (!_settings.GroupRepeatedLogs)
+        {
+            Log(message);
+            return;
+        }
         var now = DateTime.Now;
         if (_lastWorkerLogMessage is not null && string.Equals(_lastWorkerLogMessage, message, StringComparison.Ordinal) &&
             (now - _lastWorkerLogAt).TotalMilliseconds < 1400)
@@ -3380,7 +3561,7 @@ public sealed class MainForm : Form
             : message.Contains("warning", StringComparison.OrdinalIgnoreCase) ? "Warnings"
             : message.StartsWith("[Player", StringComparison.OrdinalIgnoreCase) ? "Player" : "Editor";
         _outputEntries.Add(new EditorLogEntry(DateTime.Now, category, message));
-        while (_outputEntries.Count > 2000) _outputEntries.RemoveAt(0);
+        while (_outputEntries.Count > _settings.MaxOutputEntries) _outputEntries.RemoveAt(0);
         RefreshOutputList();
     }
 
@@ -3411,6 +3592,7 @@ public sealed class MainForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         SaveDockLayout();
+        PersistSettings();
         _scriptHistoryTimer.Stop();
         _scriptHistoryTimer.Dispose();
         StopPreview();
