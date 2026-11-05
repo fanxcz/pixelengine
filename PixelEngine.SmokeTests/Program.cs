@@ -625,10 +625,18 @@ try
     };
     var sparseBaseline = new AnimationPose(new Vector2(999f, 456f), 27f, new Vector2(2f, 3f));
     var sparseMiddle = AnimationEvaluator.Evaluate(sparseClip, 1f, sparseBaseline);
+    // X is keyed at t=0 and t=2 with a blank key at t=1, so the blank key must be transparent and
+    // X must interpolate straight through it (20). ScaleY is first keyed at t=2, therefore it keeps
+    // the live baseline (3) at t=1 exactly like every other channel before its first authored key.
     if (Math.Abs(sparseMiddle.Position.X - 20f) > .01f || sparseMiddle.Position.Y != sparseBaseline.Position.Y ||
         Math.Abs(sparseMiddle.Rotation - sparseBaseline.Rotation) > .01f || sparseMiddle.Scale.X != sparseBaseline.Scale.X ||
-        Math.Abs(sparseMiddle.Scale.Y - 3.5f) > .01f)
-        throw new InvalidDataException("Sparse/blank keyframes modified unkeyed transform channels.");
+        Math.Abs(sparseMiddle.Scale.Y - sparseBaseline.Scale.Y) > .01f)
+        throw new InvalidDataException($"Sparse/blank keyframes modified unkeyed transform channels (x={sparseMiddle.Position.X}, y={sparseMiddle.Position.Y}, rot={sparseMiddle.Rotation}, sx={sparseMiddle.Scale.X}, sy={sparseMiddle.Scale.Y}).");
+    // Past the first ScaleY key the authored value is published, and a blank key never pins a
+    // channel to zero: the value is the authored 4, not 0.
+    var sparseEnd = AnimationEvaluator.Evaluate(sparseClip, 2f, sparseBaseline);
+    if (Math.Abs(sparseEnd.Scale.Y - 4f) > .01f || Math.Abs(sparseEnd.Position.X - 30f) > .01f)
+        throw new InvalidDataException("Blank keyframes suppressed an authored channel value at the clip end.");
 
     var duplicateTimeClip = new LicAnimationClipData
     {
@@ -745,8 +753,27 @@ try
     bakeMethod.Invoke(null, new object[] { collisionScene, collisionMap });
     var bakedColliders = collisionScene.Objects.Select(x => x.GetComponent<BoxCollider2DComponent>()).Where(x => x is not null).ToArray();
     if (bakedColliders.Length != 1 || bakedColliders[0]!.Size != new Vector2(32f, 16f)
-        || collisionScene.Objects[0].Transform.Position != new Vector2(50f, 44f))
-        throw new InvalidDataException("TileMap collision baker did not merge adjacent solid cells into the expected static rectangle.");
+        || collisionScene.Objects[0].Transform.Position != new Vector2(42f, 44f))
+        throw new InvalidDataException($"TileMap collision baker did not merge adjacent solid cells into one static rectangle (count={bakedColliders.Length}, size={bakedColliders.FirstOrDefault()?.Size}, position={collisionScene.Objects.FirstOrDefault()?.Transform.Position}).");
+    // A solid block must collapse into a single rectangle instead of one collider per row.
+    var blockMap = new LicTileMapData { Name = "BlockMap", Width = 3, Height = 3, TileSize = 10, CollisionEnabled = true };
+    blockMap.EnsureCellStorage();
+    blockMap.PaintRectangle(0, 0, 3, 3, 1);
+    var blockScene = new Scene("TileMapBlockBake");
+    bakeMethod.Invoke(null, new object[] { blockScene, blockMap });
+    var blockColliders = blockScene.Objects.Select(x => x.GetComponent<BoxCollider2DComponent>()).Where(x => x is not null).ToArray();
+    if (blockColliders.Length != 1 || blockColliders[0]!.Size != new Vector2(30f, 30f))
+        throw new InvalidDataException($"TileMap collision baker emitted {blockColliders.Length} rectangle(s) for a solid 3x3 block instead of one.");
+    // Two separate islands keep two rectangles and never lose coverage.
+    var islandMap = new LicTileMapData { Name = "IslandMap", Width = 4, Height = 2, TileSize = 8, CollisionEnabled = true };
+    islandMap.EnsureCellStorage();
+    islandMap.SetCell(0, 0, 1);
+    islandMap.SetCell(3, 1, 1);
+    var islandScene = new Scene("TileMapIslandBake");
+    bakeMethod.Invoke(null, new object[] { islandScene, islandMap });
+    var islandColliders = islandScene.Objects.Select(x => x.GetComponent<BoxCollider2DComponent>()).Where(x => x is not null).ToArray();
+    if (islandColliders.Length != 2 || islandScene.Objects.Sum(x => x.GetComponent<BoxCollider2DComponent>()?.Size.X ?? 0f) != 16f)
+        throw new InvalidDataException("TileMap collision baker did not keep disconnected islands as separate colliders.");
 
     var caveA = new LicTileMapData { Width = 32, Height = 24 };
     var caveB = new LicTileMapData { Width = 32, Height = 24 };
@@ -971,13 +998,17 @@ try
     var invalidTileProject = LicProjectReader.Parse("""{"name":"InvalidTile","scenes":[{"name":"Main","objects":[]}],"pixelEngine":{"tileMaps":[{"name":"Map","width":2,"height":2,"tileSize":16,"palette":["#00000000","#FFFFFF"],"cells":[0,99,0,0]}]}}""");
     if (!ProjectDiagnostics.Analyze(invalidTileProject).Any(x => x.Code == "PE1703"))
         throw new InvalidDataException("LIC reader discarded an invalid tile index before Diagnostics could report it.");
-    var invalidTileDimensions = LicProjectReader.Parse("""{"name":"InvalidTileDimensions","scenes":[{"name":"Main","objects":[]}],"pixelEngine":{"tileMaps":[{"name":"Oversized","width":513,"height":1,"tileSize":300,"palette":["#00000000","#FFFFFF"],"cells":[1,2,3]}]}}""");
+    var invalidTileDimensions = LicProjectReader.Parse("""{"name":"InvalidTileDimensions","scenes":[{"name":"Main","objects":[]}],"pixelEngine":{"tileMaps":[{"name":"Oversized","width":513,"height":1,"tileSize":300,"palette":["#00000000","#FFFFFF","#FF0000"],"cells":[1,2,3]}]}}""");
     var oversizedMap = invalidTileDimensions.EditorData!.TileMaps[0];
     if (oversizedMap.Width != 513 || !ProjectDiagnostics.Analyze(invalidTileDimensions).Any(x => x.Code == "PE1701"))
         throw new InvalidDataException("LIC reader normalized malformed TileMap dimensions before Diagnostics could report them.");
     ProjectDiagnostics.ApplySafeFixes(invalidTileDimensions);
-    if (oversizedMap.Width != 512 || oversizedMap.TileSize != 256 || oversizedMap.GetCell(0, 0) != 1 || oversizedMap.GetCell(1, 0) != 2)
-        throw new InvalidDataException("TileMap safe repair did not clamp dimensions while preserving overlapping authored cells.");
+    // Width clamps 513 -> 512, tile size 300 -> 256, authored cells survive at their original (x, y)
+    // despite the authored row stride, and only the palette index outside the palette is cleared.
+    if (oversizedMap.Width != 512 || oversizedMap.TileSize != 256 || oversizedMap.GetCell(0, 0) != 1 ||
+        oversizedMap.GetCell(1, 0) != 2 || oversizedMap.GetCell(2, 0) != 0 ||
+        oversizedMap.Cells.Count != oversizedMap.Width * oversizedMap.Height)
+        throw new InvalidDataException($"TileMap safe repair did not clamp dimensions while preserving overlapping authored cells (width={oversizedMap.Width}, tileSize={oversizedMap.TileSize}, cells=[{string.Join(',', oversizedMap.Cells.Take(4))}]).");
     var shortTileBuffer = LicProjectReader.Parse("""{"name":"ShortTileBuffer","scenes":[{"name":"Main","objects":[]}],"pixelEngine":{"tileMaps":[{"name":"Short","width":2,"height":2,"tileSize":16,"palette":["#00000000","#FFFFFF"],"cells":[1]}]}}""");
     if (!ProjectDiagnostics.Analyze(shortTileBuffer).Any(x => x.Code == "PE1702"))
         throw new InvalidDataException("LIC reader silently padded malformed TileMap cell buffers before Diagnostics could report them.");
