@@ -167,13 +167,6 @@ internal sealed class StudioToolStripRenderer : ToolStripRenderer
         e.Graphics.FillRectangle(brush, e.ToolStripPanel.Bounds);
     }
 
-    protected override void OnRenderCheckBackground(ToolStripItemRenderEventArgs e)
-    {
-        var checkBounds = new Rectangle(Point.Empty, e.Item.Size);
-        checkBounds.Inflate(-2, -2);
-        Theme.PaintCard(e.Graphics, checkBounds, Theme.Selection, Theme.AccentDark, Theme.RadiusSmall);
-    }
-
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
     {
         var bounds = e.ImageRectangle;

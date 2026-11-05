@@ -3740,7 +3740,7 @@ internal sealed class SceneCanvas : Panel
         }
     }
 
-    private void DrawGrid(Graphics g, PointF center, float gridStep)
+    private void DrawGrid(System.Drawing.Graphics g, PointF center, float gridStep)
     {
         using var minorPen = new Pen(Theme.GridMinor, 1f);
         using var majorPen = new Pen(Theme.GridMajor, 1f);
@@ -3754,7 +3754,7 @@ internal sealed class SceneCanvas : Panel
             g.DrawLine(index % 4 == 0 ? majorPen : minorPen, 0, y, Width, y);
     }
 
-    private void DrawAxes(Graphics g, PointF origin)
+    private void DrawAxes(System.Drawing.Graphics g, PointF origin)
     {
         using var axisPen = new Pen(Theme.WithAlpha(Theme.Accent, 70), 1f);
         if (origin.X >= 0 && origin.X <= Width) g.DrawLine(axisPen, origin.X, 0, origin.X, Height);
@@ -3765,7 +3765,7 @@ internal sealed class SceneCanvas : Panel
     }
 
     /// <summary>Subtle depth cue so the flat canvas does not read as an empty panel.</summary>
-    private void DrawViewportVignette(Graphics g, Color background)
+    private void DrawViewportVignette(System.Drawing.Graphics g, Color background)
     {
         if (Width <= 0 || Height <= 0) return;
         var top = Theme.Blend(background, Theme.Window, .45f);
@@ -3775,7 +3775,7 @@ internal sealed class SceneCanvas : Panel
         g.FillRectangle(brush, 0, 0, Width, Height);
     }
 
-    private void DrawEmptyState(Graphics g)
+    private void DrawEmptyState(System.Drawing.Graphics g)
     {
         using var titleFont = Theme.Strong(Theme.FontTitle);
         using var bodyFont = Theme.Body(Theme.FontBody);
@@ -3790,7 +3790,7 @@ internal sealed class SceneCanvas : Panel
     }
 
     /// <summary>Scene chrome: viewport badge, object count and the keyboard hint bar.</summary>
-    private void DrawSceneOverlay(Graphics g, LicSceneData scene)
+    private void DrawSceneOverlay(System.Drawing.Graphics g, LicSceneData scene)
     {
         var badge = new Rectangle(Theme.Px(12), Theme.Px(10), Theme.Px(430), Theme.Px(26));
         Theme.PaintCard(g, badge, Theme.WithAlpha(Theme.Window, 210), Theme.Border, Theme.RadiusSmall);

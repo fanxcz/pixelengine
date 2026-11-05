@@ -142,7 +142,7 @@ internal static class Theme
     }
 
     /// <summary>Draws a rounded filled panel with an optional hairline border.</summary>
-    public static void PaintCard(Graphics graphics, Rectangle bounds, Color fill, Color border, int radius)
+    public static void PaintCard(System.Drawing.Graphics graphics, Rectangle bounds, Color fill, Color border, int radius)
     {
         var smoothing = graphics.SmoothingMode;
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
