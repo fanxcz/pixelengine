@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build PixelEngine Solution",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "PixelEngine.sln", "-c", "Debug"],
+      "problemMatcher": "$msCompile",
+      "group": {"kind": "build", "isDefault": true},
+      "presentation": {"reveal": "always", "panel": "shared", "clear": false}
+    },
+    {
+      "label": "Build PixelEngine Editor",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "PixelEngine.Editor/PixelEngine.Editor.csproj", "-c", "Debug"],
+      "problemMatcher": "$msCompile",
+      "presentation": {"reveal": "always", "panel": "shared"}
+    },
+    {
+      "label": "Run PixelEngine Smoke Tests",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["run", "--project", "PixelEngine.SmokeTests/PixelEngine.SmokeTests.csproj", "-c", "Release", "--", "${workspaceFolder}"],
+      "problemMatcher": "$msCompile",
+      "presentation": {"reveal": "always", "panel": "shared", "clear": true}
+    },
+    {
+      "label": "Run PixelEngine Editor",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["run", "--project", "PixelEngine.Editor/PixelEngine.Editor.csproj", "-c", "Debug"],
+      "problemMatcher": "$msCompile",
+      "presentation": {"reveal": "always", "panel": "dedicated"}
+    },
+    {
+      "label": "Run ASHFALL",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["run", "--project", "PixelEngine.Sandbox/PixelEngine.Sandbox.csproj", "-c", "Debug", "--", "Games/Ashfall/Ashfall.lic"],
+      "problemMatcher": "$msCompile",
+      "presentation": {"reveal": "always", "panel": "dedicated"}
+    }
+  ]
+}

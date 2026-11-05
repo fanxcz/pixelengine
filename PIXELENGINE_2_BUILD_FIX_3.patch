@@ -1,0 +1,39 @@
+--- a/PixelEngine.Core/Animation/AnimationEvaluator.cs
++++ b/PixelEngine.Core/Animation/AnimationEvaluator.cs
+@@ -15,7 +15,8 @@
+         if (keyframes is null || keyframes.Count == 0 || !float.IsFinite(time)) return -1;
+ 
+         var bestIndex = -1;
+-        var bestDistance = float.PositiveInfinity;
++        // Keep the distance in double: two finite float timestamps can differ by more than float.MaxValue.
++        var bestDistance = double.PositiveInfinity;
+         for (var i = 0; i < keyframes.Count; i++)
+         {
+             var key = keyframes[i];
+--- a/PixelEngine.Core/Diagnostics/ProjectDiagnostics.cs
++++ b/PixelEngine.Core/Diagnostics/ProjectDiagnostics.cs
+@@ -25,7 +25,7 @@
+         var assetTypes = assetList.Where(x => !string.IsNullOrWhiteSpace(x.Name))
+             .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+             .ToDictionary(x => x.Key, x => x.First().Type ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+-        var scripts = (project.Scripts ?? new()).ToDictionarySafe(x => x.Name);
++        var scripts = (project.Scripts ?? new()).ToDictionarySafe();
+         var prefabs = (project.Prefabs ?? new()).Select(x => x.Name).Where(x => !string.IsNullOrWhiteSpace(x))
+             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+         foreach (var duplicate in (project.Prefabs ?? new()).GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase).Where(x => x.Count() > 1))
+--- a/PixelEngine.SmokeTests/Program.cs
++++ b/PixelEngine.SmokeTests/Program.cs
+@@ -237,7 +237,12 @@
+     if (AnimationEvaluator.FindNearestKeyframeIndex(timelineKeys, 1.7f) != 0 ||
+         AnimationEvaluator.FindNearestKeyframeIndex(timelineKeys, 0.1f) != 2 ||
+         AnimationEvaluator.FindNearestKeyframeIndex(timelineKeys, float.NaN) != -1 ||
+-        AnimationEvaluator.FindNearestKeyframeIndex(new[] { new LicAnimationKeyframeData { Time = float.PositiveInfinity } }, 1f) != -1)
++        AnimationEvaluator.FindNearestKeyframeIndex(new[] { new LicAnimationKeyframeData { Time = float.PositiveInfinity } }, 1f) != -1 ||
++        AnimationEvaluator.FindNearestKeyframeIndex(new[]
++        {
++            new LicAnimationKeyframeData { Time = -float.MaxValue },
++            new LicAnimationKeyframeData { Time = float.MaxValue }
++        }, float.MaxValue) != 1)
+         throw new InvalidDataException("Timeline nearest-key selection did not handle unsorted or invalid key times correctly.");
+     Console.WriteLine("PASS animation handles unsorted/invalid keys and timeline nearest-key selection in linear time");
+ 

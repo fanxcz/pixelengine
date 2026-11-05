@@ -1,0 +1,27 @@
+{
+  "editor.fontFamily": "Cascadia Code, Consolas, monospace",
+  "editor.fontSize": 13,
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.formatOnSave": true,
+  "editor.minimap.enabled": true,
+  "editor.renderWhitespace": "selection",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "**/.vs": true
+  },
+  "search.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "**/Content": false
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "dotnet.defaultSolution": "PixelEngine.sln",
+  "csharp.suppressDotnetRestoreNotification": true,
+  "files.associations": {
+    "*.lic": "json"
+  }
+}

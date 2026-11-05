@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>PixelFightTests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\PixelFight\Game\Game.cs" />
+    <Compile Include="..\PixelFight\Game\Countries.cs" />
+    <Compile Include="..\PixelFight\Engine\GameForm.cs" />
+    <Compile Include="..\PixelFight\Engine\Binds.cs" />
+    <Compile Include="..\PixelFight\Engine\Pad.cs" />
+    <Compile Include="..\PixelFight\Engine\GameIcon.cs" />
+    <Compile Include="..\PixelFight\Engine\LicProject.cs" />
+    <Compile Include="..\PixelFight\Engine\Store.cs" />
+    <Compile Include="..\PixelFight\Engine\KnightsDefense.cs" />
+    <Compile Include="..\PixelFight\Engine\TowerDefense.cs" />
+    <Compile Include="..\PixelFight\Engine\MerchantGame.cs" />
+    <Compile Include="..\PixelFight\Engine\StrategyGame.cs" />
+    <Compile Include="..\PixelFight\Engine\Scripting.cs" />
+    <Compile Include="..\PixelFight\Engine\Runtime.cs" />
+    <Compile Include="..\PixelFight\Engine\Ui.cs" />
+    <Compile Include="..\PixelFight\Engine\Save.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.11.0" />
+    <PackageReference Include="MoonSharp" Version="2.0.0" />
+  </ItemGroup>
+</Project>

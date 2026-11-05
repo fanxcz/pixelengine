@@ -1,0 +1,29 @@
+--- a/PixelEngine.Editor/MainForm.cs
++++ b/PixelEngine.Editor/MainForm.cs
+@@ -732,7 +732,7 @@
+         return Project.Scenes[index];
+     }
+ 
+-    private static void DrawObject(Graphics g, LicObjectData item, PointF center, float scale, bool selected)
++    private static void DrawObject(System.Drawing.Graphics g, LicObjectData item, PointF center, float scale, bool selected)
+     {
+         var x = center.X + item.X * scale;
+         var y = center.Y + item.Y * scale;
+@@ -776,7 +776,7 @@
+         g.DrawString(item.Name, labelFont, labelBrush, x - width * .5f, y + height * .5f + 2);
+     }
+ 
+-    private static void DrawPolygon(Graphics g, LicObjectData item, PointF center, float scale, Pen pen)
++    private static void DrawPolygon(System.Drawing.Graphics g, LicObjectData item, PointF center, float scale, Pen pen)
+     {
+         if (item.Points is null || item.Points.Count < 4) return;
+         var ring = new List<PointF>();
+@@ -795,7 +795,7 @@
+         DrawRing(g, ring, pen);
+     }
+ 
+-    private static void DrawRing(Graphics g, List<PointF> ring, Pen pen)
++    private static void DrawRing(System.Drawing.Graphics g, List<PointF> ring, Pen pen)
+     {
+         if (ring.Count >= 3) g.DrawPolygon(pen, ring.ToArray());
+         else if (ring.Count == 2) g.DrawLine(pen, ring[0], ring[1]);

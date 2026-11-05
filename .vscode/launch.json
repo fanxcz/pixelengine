@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PixelEngine Editor",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build PixelEngine Editor",
+      "program": "${workspaceFolder}/PixelEngine.Editor/bin/Debug/net8.0-windows/PixelEngine.Editor.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "ASHFALL Game",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build PixelEngine Solution",
+      "program": "${workspaceFolder}/PixelEngine.Sandbox/bin/Debug/net8.0/PixelEngine.Sandbox.dll",
+      "args": ["${workspaceFolder}/Games/Ashfall/Ashfall.lic"],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}

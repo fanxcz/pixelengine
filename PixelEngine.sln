@@ -1,0 +1,36 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelEngine.Core", "PixelEngine.Core\PixelEngine.Core.csproj", "{A19C5C6E-5D90-4E31-9C45-8F56A7C71001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelEngine.Sandbox", "PixelEngine.Sandbox\PixelEngine.Sandbox.csproj", "{A19C5C6E-5D90-4E31-9C45-8F56A7C71002}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelEngine.SmokeTests", "PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj", "{A19C5C6E-5D90-4E31-9C45-8F56A7C71003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelEngine.Editor", "PixelEngine.Editor\PixelEngine.Editor.csproj", "{A19C5C6E-5D90-4E31-9C45-8F56A7C71004}"
+EndProject
+Global
+ GlobalSection(SolutionConfigurationPlatforms) = preSolution
+  Debug|Any CPU = Debug|Any CPU
+  Release|Any CPU = Release|Any CPU
+ EndGlobalSection
+ GlobalSection(ProjectConfigurationPlatforms) = postSolution
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71001}.Release|Any CPU.Build.0 = Release|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71002}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71002}.Debug|Any CPU.Build.0 = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71002}.Release|Any CPU.ActiveCfg = Release|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71002}.Release|Any CPU.Build.0 = Release|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71003}.Debug|Any CPU.Build.0 = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71003}.Release|Any CPU.ActiveCfg = Release|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71003}.Release|Any CPU.Build.0 = Release|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71004}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71004}.Debug|Any CPU.Build.0 = Debug|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71004}.Release|Any CPU.ActiveCfg = Release|Any CPU
+  {A19C5C6E-5D90-4E31-9C45-8F56A7C71004}.Release|Any CPU.Build.0 = Release|Any CPU
+ EndGlobalSection
+EndGlobal

@@ -1,0 +1,20 @@
+PixelEngine 2.0 Stage 7 Quality Pass - compiler fix
+
+The reported CS1039/CS1073 errors originate from a malformed interpolated string
+in PixelEngine.Editor/MainForm.cs inside AlignSelectedObject(). The final "Y"
+branch had a misplaced apostrophe, terminating the string incorrectly. It is now:
+
+Log($"Aligned '{selected.Name}' to world origin {(alignX && alignY ? "X/Y" : alignX ? "X" : "Y")}.");
+
+The actual source line closes the message immediately after the period; there is no trailing space.
+
+The many CS0106 and CS1513 diagnostics in the submitted log are parser-cascade
+errors following the malformed string, not independent missing method modifiers.
+
+Validation performed here:
+- corrected source line inspected with a C# lexer
+- delimiter balance checked across MainForm.cs
+- ZIP source files and project metadata checked separately
+
+A real dotnet build was not run in this environment because the .NET SDK is
+not installed. Please run `dotnet build PixelEngine.sln` on Windows to confirm.
