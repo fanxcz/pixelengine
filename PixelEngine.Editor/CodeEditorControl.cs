@@ -75,11 +75,14 @@ internal sealed class CodeEditorControl : UserControl
     }
 
     /// <summary>Applies persisted preferences (font size and word wrap).</summary>
-    public void ApplyPreferences(float fontSize, bool wordWrap)
+    public void ApplyPreferences(float fontSize, bool wordWrap, bool showLineNumbers = true)
     {
         var size = float.IsFinite(fontSize) ? Math.Clamp(fontSize, 7f, 32f) : 10f;
         _editor.Font = Theme.Mono(size);
         _editor.WordWrap = wordWrap;
+        // Word wrap changes the gutter mapping, so the gutter is hidden rather than left stale.
+        _gutter.Visible = showLineNumbers;
+        _gutter.Width = Theme.Px(50);
         _gutter.Invalidate();
     }
 

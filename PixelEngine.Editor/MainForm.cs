@@ -949,7 +949,7 @@ public sealed class MainForm : Form
         _sceneCanvas.ShowObjectLabels = _settings.SceneShowLabels;
         _terminal.ApplyPreferences(_settings.TerminalFontSize, _settings.TerminalScrollback,
             _settings.DefaultShell == "Command Prompt" ? TerminalShell.Cmd : TerminalShell.PowerShell);
-        _codeEditor.ApplyPreferences(_settings.ScriptFontSize, _settings.ScriptWordWrap);
+        _codeEditor.ApplyPreferences(_settings.ScriptFontSize, _settings.ScriptWordWrap, _settings.ScriptShowLineNumbers);
         _output.IntegralHeight = false;
     }
 

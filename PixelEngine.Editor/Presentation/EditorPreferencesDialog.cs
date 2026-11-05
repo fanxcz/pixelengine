@@ -20,6 +20,7 @@ internal sealed class EditorPreferencesDialog : Form
     private readonly NumericUpDown _scrollback = new() { Minimum = 500, Maximum = 50_000, Increment = 500, Width = Theme.Px(110) };
     private readonly NumericUpDown _scriptFont = new() { Minimum = 7, Maximum = 32, DecimalPlaces = 1, Increment = 0.5m, Width = Theme.Px(90) };
     private readonly CheckBox _wrap = new() { Text = "Wrap long lines", AutoSize = true };
+    private readonly CheckBox _lineNumbers = new() { Text = "Show line numbers", AutoSize = true };
     private readonly NumericUpDown _gridSize = new() { Minimum = 1, Maximum = 512, Width = Theme.Px(90) };
     private readonly CheckBox _snap = new() { Text = "Snap to grid", AutoSize = true };
     private readonly CheckBox _showGrid = new() { Text = "Show grid", AutoSize = true };
@@ -67,11 +68,47 @@ internal sealed class EditorPreferencesDialog : Form
 
         stack.Controls.Add(Section("SCRIPT EDITOR"));
         stack.Controls.Add(Row("Font size (pt)", _scriptFont));
-        stack.Controls.Add(_wrap);
+        var scriptToggles = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, Theme.Px(4), 0, 0)
+        };
+        scriptToggles.Controls.AddRange([_wrap, _lineNumbers]);
+        stack.Controls.Add(scriptToggles);
 
         stack.Controls.Add(Section("SCENE VIEW DEFAULTS"));
         stack.Controls.Add(Row("Grid size", _gridSize));
         foreach (var box in new[] { _snap, _showGrid, _showColliders, _showLabels }) stack.Controls.Add(box);
+
+        stack.Controls.Add(Section("RECENT PROJECTS"));
+        var recentRow = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, Theme.Px(2), 0, 0)
+        };
+        var recentCount = new Label
+        {
+            AutoSize = true,
+            ForeColor = Theme.Muted,
+            Font = Theme.Body(Theme.FontBody),
+            Text = RecentSummary(),
+            Margin = new Padding(0, Theme.Px(8), Theme.Px(12), 0)
+        };
+        var clearRecent = new StudioButton("Clear list") { Width = Theme.Px(110), Kind = StudioButtonKind.Ghost };
+        clearRecent.Click += (_, _) =>
+        {
+            // Only the working copy is touched: Cancel still restores the previous history.
+            _working.RecentProjects.Clear();
+            recentCount.Text = RecentSummary();
+        };
+        recentRow.Controls.AddRange([recentCount, clearRecent]);
+        stack.Controls.Add(recentRow);
 
         var note = new Label
         {
@@ -131,13 +168,19 @@ internal sealed class EditorPreferencesDialog : Form
 
     private static Panel Row(string label, Control editor)
     {
-        var row = new Panel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Width = Theme.Px(560), Margin = new Padding(0, Theme.Px(2), 0, Theme.Px(4)) };
+        var row = new Panel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, MinimumSize = new Size(Theme.Px(520), 0), Margin = new Padding(0, Theme.Px(2), 0, Theme.Px(4)) };
         var caption = new Label { Text = label, AutoSize = true, ForeColor = Theme.Muted, Location = new Point(0, Theme.Px(6)), Font = Theme.Body(Theme.FontBody) };
         editor.Location = new Point(Theme.Px(230), 0);
         row.Controls.Add(editor);
         row.Controls.Add(caption);
         row.Height = Math.Max(editor.Height, caption.Height) + Theme.Px(4);
         return row;
+    }
+
+    private string RecentSummary()
+    {
+        var count = _working.RecentProjects.Count;
+        return count == 0 ? "No recent projects" : $"{count} recent project(s) remembered";
     }
 
     private void Apply(EditorSettings settings)
@@ -152,6 +195,7 @@ internal sealed class EditorPreferencesDialog : Form
         _scrollback.Value = Math.Clamp(settings.TerminalScrollback, (int)_scrollback.Minimum, (int)_scrollback.Maximum);
         _scriptFont.Value = Math.Clamp((decimal)settings.ScriptFontSize, _scriptFont.Minimum, _scriptFont.Maximum);
         _wrap.Checked = settings.ScriptWordWrap;
+        _lineNumbers.Checked = settings.ScriptShowLineNumbers;
         _gridSize.Value = Math.Clamp((decimal)settings.SceneGridSize, _gridSize.Minimum, _gridSize.Maximum);
         _snap.Checked = settings.SceneSnap;
         _showGrid.Checked = settings.SceneShowGrid;
@@ -171,6 +215,7 @@ internal sealed class EditorPreferencesDialog : Form
         _working.TerminalScrollback = (int)_scrollback.Value;
         _working.ScriptFontSize = (float)_scriptFont.Value;
         _working.ScriptWordWrap = _wrap.Checked;
+        _working.ScriptShowLineNumbers = _lineNumbers.Checked;
         _working.SceneGridSize = (float)_gridSize.Value;
         _working.SceneSnap = _snap.Checked;
         _working.SceneShowGrid = _showGrid.Checked;
