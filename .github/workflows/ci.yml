@@ -1,4 +1,4 @@
-name: PixelEngine Stage 12 CI
+name: PixelEngine CI
 
 on:
   push:
@@ -8,10 +8,16 @@ on:
 permissions:
   contents: read
 
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  NUGET_PACKAGES: ${{ github.workspace }}\.nuget\packages
+
 jobs:
   build-and-smoke-test:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,6 +27,59 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Verify Stage 12
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
         shell: pwsh
-        run: .\verify-stage12.ps1
+        run: |
+          dotnet restore .\PixelEngine.sln
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::dotnet restore failed"; exit 1 }
+
+      - name: Build Debug
+        id: build-debug
+        shell: pwsh
+        run: |
+          $log = (& dotnet build .\PixelEngine.sln -c Debug --no-restore "-clp:NoSummary" 2>&1 | Out-String)
+          $code = $LASTEXITCODE
+          Write-Host $log
+          $errors = $log -split "`r?`n" | Where-Object { $_ -match ': error ' } | Select-Object -Unique
+          $warnings = $log -split "`r?`n" | Where-Object { $_ -match ': warning ' } | Select-Object -Unique
+          foreach ($line in ($errors | Select-Object -First 40)) { Write-Host "::error::$line" }
+          foreach ($line in ($warnings | Select-Object -First 20)) { Write-Host "::warning::$line" }
+          Write-Host "Debug build: $($errors.Count) error(s), $($warnings.Count) warning(s)."
+          if ($code -ne 0) { exit 1 }
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          $log = (& dotnet build .\PixelEngine.sln -c Release --no-restore "-clp:NoSummary" 2>&1 | Out-String)
+          $code = $LASTEXITCODE
+          Write-Host $log
+          $errors = $log -split "`r?`n" | Where-Object { $_ -match ': error ' } | Select-Object -Unique
+          foreach ($line in ($errors | Select-Object -First 40)) { Write-Host "::error::$line" }
+          if ($code -ne 0) { exit 1 }
+
+      - name: Smoke tests
+        shell: pwsh
+        run: |
+          $log = (& dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Release --no-build -- . 2>&1 | Out-String)
+          $code = $LASTEXITCODE
+          Write-Host $log
+          $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*FAIL' } | Select-Object -Unique
+          foreach ($line in ($failures | Select-Object -First 40)) { Write-Host "::error::$line" }
+          if ($code -ne 0) { exit 1 }
+
+      - name: Smoke tests (Debug)
+        shell: pwsh
+        run: |
+          $log = (& dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Debug --no-build -- . 2>&1 | Out-String)
+          $code = $LASTEXITCODE
+          Write-Host $log
+          $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*FAIL' } | Select-Object -Unique
+          foreach ($line in ($failures | Select-Object -First 40)) { Write-Host "::error::$line" }
+          if ($code -ne 0) { exit 1 }
