@@ -28,14 +28,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Check whether Pages is enabled
+        id: pages-status
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $uri = "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/pages"
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          try {
+            Invoke-RestMethod -Method Get -Uri $uri -Headers $headers | Out-Null
+            "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } catch {
+            $status = 0
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+              $status = [int]$_.Exception.Response.StatusCode
+            }
+            if ($status -eq 404) {
+              "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Host "::notice::GitHub Pages is not enabled yet. Open Settings > Pages and set Source to GitHub Actions."
+            } else {
+              throw
+            }
+          }
+
       - name: Configure Pages
+        if: steps.pages-status.outputs.enabled == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload website
+        if: steps.pages-status.outputs.enabled == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
           path: ./docs
 
       - name: Deploy website
+        if: steps.pages-status.outputs.enabled == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
