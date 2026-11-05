@@ -197,6 +197,39 @@ try
         }
     });
 
+    Check("packaged startup opens the bundled demo and finds the adjacent player", () =>
+    {
+        var package = Path.Combine(scratch, "release-package");
+        var licDirectory = Path.Combine(package, "Lic");
+        Directory.CreateDirectory(licDirectory);
+        var demoPath = Path.Combine(licDirectory, "demo.lic");
+        File.WriteAllText(demoPath, "{}");
+        File.WriteAllText(Path.Combine(package, "PixelEngine.Sandbox.exe"), "player");
+
+        var resolvedProject = EditorLaunchPaths.ResolveInitialProject(
+            Array.Empty<string>(), null, package, scratch);
+        if (resolvedProject != Path.GetFullPath(demoPath))
+            throw new InvalidOperationException("A packaged editor did not resolve Lic/demo.lic.");
+
+        var playerPath = EditorLaunchPaths.FindBundledPlayer(package);
+        if (playerPath != Path.Combine(package, "PixelEngine.Sandbox.exe"))
+            throw new InvalidOperationException("A packaged editor did not find the adjacent Player executable.");
+    });
+
+    Check("explicit LIC command-line argument overrides the bundled demo", () =>
+    {
+        var package = Path.Combine(scratch, "explicit-project-package");
+        var external = Path.Combine(scratch, "custom.lic");
+        Directory.CreateDirectory(Path.Combine(package, "Lic"));
+        File.WriteAllText(Path.Combine(package, "Lic", "demo.lic"), "{}");
+        File.WriteAllText(external, "{}");
+
+        var resolved = EditorLaunchPaths.ResolveInitialProject(
+            new[] { external }, null, package, scratch);
+        if (resolved != Path.GetFullPath(external))
+            throw new InvalidOperationException("The explicit project argument was not selected.");
+    });
+
     Check("project fixtures still load through the editor's project reader", () =>
     {
         var root = FindRepositoryRoot();
