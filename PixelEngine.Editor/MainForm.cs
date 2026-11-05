@@ -1964,7 +1964,6 @@ public sealed class MainForm : Form
         tabs.HotTrack = true;
         tabs.Padding = new Point(0, 0);
         if (tabs is StudioTabControl studioTabs) studioTabs.FixedTabWidth = Math.Max(52, width);
-        StudioControlStyler.StyleTabPage(tabs, tabs.TabPages.Count > 0 ? tabs.TabPages[0] : new TabPage());
     }
 
     private Control WrapPanel(string title, Control content)

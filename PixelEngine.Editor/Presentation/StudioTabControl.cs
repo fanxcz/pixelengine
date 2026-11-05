@@ -74,7 +74,7 @@ internal sealed class StudioTabControl : TabControl
         }
     }
 
-    private void DrawOverflowIndicator(Graphics graphics, int x)
+    private void DrawOverflowIndicator(System.Drawing.Graphics graphics, int x)
     {
         using var brush = new SolidBrush(Theme.Muted);
         var y = ItemSize.Height / 2;
@@ -82,7 +82,7 @@ internal sealed class StudioTabControl : TabControl
         graphics.FillEllipse(brush, x + 11, y - 2, 4, 4);
     }
 
-    private void DrawTab(Graphics graphics, TabPage page, Rectangle bounds, bool selected, bool hovered)
+    private void DrawTab(System.Drawing.Graphics graphics, TabPage page, Rectangle bounds, bool selected, bool hovered)
     {
         var body = new Rectangle(bounds.X + 1, bounds.Y + Theme.Px(3), Math.Max(1, bounds.Width - 2), Math.Max(1, bounds.Height - Theme.Px(3)));
         var fill = selected ? Theme.TabActive : hovered ? Theme.Hover : StripColor;

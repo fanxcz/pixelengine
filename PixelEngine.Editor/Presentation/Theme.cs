@@ -98,8 +98,16 @@ internal static class Theme
     {
         try
         {
-            using var graphics = control.CreateGraphics();
-            _dpi = Math.Clamp((int)Math.Round(graphics.DpiY), 96, 384);
+            // Prefer the control's own DPI. Creating a Graphics object before the handle exists
+            // would force early handle creation and disturb the first layout pass, so fall back
+            // to the desktop DPI in that case.
+            if (control is not null && control.IsHandleCreated)
+            {
+                _dpi = Math.Clamp(control.DeviceDpi, 96, 384);
+                return;
+            }
+            using var screen = Graphics.FromHwnd(IntPtr.Zero);
+            _dpi = Math.Clamp((int)Math.Round(screen.DpiY), 96, 384);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)
         {

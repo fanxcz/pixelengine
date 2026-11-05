@@ -225,17 +225,12 @@ internal static class StudioControlStyler
             case Label label:
                 label.ForeColor = label.ForeColor == Theme.Text || label.ForeColor == default ? Theme.Text : label.ForeColor;
                 label.BackColor = label.BackColor == default ? Theme.Panel : label.BackColor;
-                label.Font = label.Font;
                 return;
             case Panel or UserControl:
                 if (control.BackColor == default || control.BackColor == SystemColors.Control)
                     control.BackColor = Theme.Panel;
                 if (control.ForeColor == default || control.ForeColor == Control.DefaultForeColor)
                     control.ForeColor = Theme.Text;
-                if (control is Panel p && p.BorderStyle == BorderStyle.FixedSingle)
-                {
-                    p.Padding = new Padding(p.Padding.Left + (p.Padding.Left == 0 ? 1 : 0));
-                }
                 return;
             case PictureBox picture:
                 picture.BackColor = picture.BackColor == default ? Theme.Viewport : picture.BackColor;

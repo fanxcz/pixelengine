@@ -72,7 +72,6 @@ internal sealed class EditorTerminalControl : UserControl
     private readonly List<TerminalLine> _lines = new();
     private readonly List<string> _history = new();
     private readonly Dictionary<TerminalShell, TerminalSession> _sessions = new();
-    private readonly TerminalShell[] _shellOrder = [TerminalShell.PowerShell, TerminalShell.Cmd];
     private readonly System.Windows.Forms.Timer _flushTimer = new() { Interval = 40 };
     private TerminalShell _activeShell = TerminalShell.PowerShell;
     private int _historyIndex;
@@ -347,14 +346,14 @@ internal sealed class EditorTerminalControl : UserControl
     private void OnSessionOutput(string line, bool isError)
     {
         if (_disposed) return;
-        if (!IsHandleCreated)
-        {
-            lock (_pendingOutputLock) _pendingOutput.Add((line, isError));
-            return;
-        }
         lock (_pendingOutputLock) _pendingOutput.Add((line, isError));
-        if (_flushTimer.Enabled) return;
-        _flushTimer.Start();
+        // This runs on a shell reader thread: the WinForms timer may only be touched on the UI
+        // thread, so scheduling the flush is marshalled like any other control access.
+        PostToUi(() =>
+        {
+            if (_flushTimer.Enabled) return;
+            _flushTimer.Start();
+        });
     }
 
     /// <summary>Batches shell output so thousands of build lines do not repaint per line.</summary>
