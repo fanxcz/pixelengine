@@ -76,6 +76,7 @@ internal sealed class EditorTerminalControl : UserControl
     private TerminalShell _activeShell = TerminalShell.PowerShell;
     private int _historyIndex;
     private bool _disposed;
+    private bool _suppressShellEvents;
     private TerminalSession? _runningSession;
 
     public Func<string>? WorkingDirectoryProvider { get; set; }
@@ -144,7 +145,11 @@ internal sealed class EditorTerminalControl : UserControl
         _run.Click += (_, _) => Execute(_command.Text);
         _stop.Click += (_, _) => StopCommand();
         _clear.Click += (_, _) => ClearOutput();
-        _shellSelector.SelectedIndexChanged += (_, _) => SwitchShell(_shellSelector.SelectedIndex == 1 ? TerminalShell.Cmd : TerminalShell.PowerShell);
+        _shellSelector.SelectedIndexChanged += (_, _) =>
+        {
+            if (_suppressShellEvents) return;
+            SwitchShell(_shellSelector.SelectedIndex == 1 ? TerminalShell.Cmd : TerminalShell.PowerShell);
+        };
         quickTasks.Click += (_, _) => ShowQuickTasks(quickTasks);
         _command.KeyDown += OnCommandKeyDown;
         _flushTimer.Tick += (_, _) => FlushPendingOutput();
@@ -164,10 +169,16 @@ internal sealed class EditorTerminalControl : UserControl
         _command.Font = Theme.Mono(size);
         _maximumLines = Math.Clamp(scrollback, 500, 50_000);
         _trimToLines = Math.Max(250, _maximumLines * 3 / 4);
-        if (_sessions.Count == 0 && _activeShell != defaultShell)
+        TrimTranscript();
+        ScrollToEnd();
+        if (_activeShell != defaultShell)
         {
             _activeShell = defaultShell;
-            _shellSelector.SelectedIndex = defaultShell == TerminalShell.Cmd ? 1 : 0;
+            // SelectIndexChanged only starts a session when one already exists; on a cold start the
+            // default shell must simply become the selected one without launching a process yet.
+            _suppressShellEvents = true;
+            try { _shellSelector.SelectedIndex = defaultShell == TerminalShell.Cmd ? 1 : 0; }
+            finally { _suppressShellEvents = false; }
             _promptLabel.Text = defaultShell == TerminalShell.PowerShell ? "PS" : ">";
             UpdateState();
         }
@@ -198,12 +209,15 @@ internal sealed class EditorTerminalControl : UserControl
         session.OutputLine += OnSessionOutput;
         session.CommandCompleted += (command, exitCode) =>
         {
+            // Captured here, on the reader thread, before any other command can start.
+            var duration = session.LastCommandDuration;
             if (_runningSession == session) _runningSession = null;
             PostToUi(() =>
             {
+                var elapsed = FormatDuration(duration);
                 AppendLine(exitCode == 0
-                    ? $"✓ Finished in {Elapsed(command)} — exit code 0."
-                    : $"✗ Command failed — exit code {exitCode}.", isError: exitCode != 0);
+                    ? $"✓ Finished in {elapsed} — exit code 0."
+                    : $"✗ Command failed — exit code {exitCode} ({elapsed}).", isError: exitCode != 0);
                 UpdateState();
                 CommandCompleted?.Invoke(command, exitCode);
             });
@@ -225,16 +239,14 @@ internal sealed class EditorTerminalControl : UserControl
         UpdateState();
     }
 
-    private readonly Dictionary<string, DateTime> _commandStartTimes = new(StringComparer.Ordinal);
-
-    private string Elapsed(string command)
+    /// <summary>Formats a measured command duration; never invents a timing when none was measured.</summary>
+    private static string FormatDuration(TimeSpan? duration)
     {
-        if (!_commandStartTimes.TryGetValue(command, out var start)) return "0.0s";
-        _commandStartTimes.Remove(command);
-        var duration = DateTime.UtcNow - start;
-        return duration.TotalSeconds >= 1
-            ? $"{duration.TotalSeconds:0.0}s"
-            : $"{Math.Max(1, duration.TotalMilliseconds):0} ms";
+        if (duration is null) return "duration unknown";
+        var value = duration.Value;
+        return value.TotalSeconds >= 1
+            ? $"{value.TotalSeconds:0.0}s"
+            : $"{Math.Max(1, value.TotalMilliseconds):0} ms";
     }
 
     /// <summary>Runs a command line in the active shell. Safe to call from the UI thread or event handlers.</summary>
@@ -255,7 +267,6 @@ internal sealed class EditorTerminalControl : UserControl
         AppendPromptLine(session, command);
         try
         {
-            if (!session.HasCommandInFlight) _commandStartTimes[command] = DateTime.UtcNow;
             session.SendCommand(command);
             _runningSession = session;
             CommandStarted?.Invoke(command);

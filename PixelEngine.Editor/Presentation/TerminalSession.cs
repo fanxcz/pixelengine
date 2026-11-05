@@ -31,6 +31,7 @@ internal sealed class TerminalSession : IDisposable
     private Process? _process;
     private int _sentinelSequence;
     private int _activeToken;
+    private DateTime? _activeCommandStartedAt;
     private string? _activeCommand;
     private bool _disposed;
 
@@ -49,6 +50,9 @@ internal sealed class TerminalSession : IDisposable
     }
 
     public bool HasCommandInFlight => Volatile.Read(ref _activeCommand) is not null;
+
+    /// <summary>Wall-clock duration of the tracked command, or <c>null</c> when nothing is tracked.</summary>
+    public TimeSpan? LastCommandDuration { get; private set; }
 
     /// <summary>Working directory reported by the shell itself (kept in sync by parsed `cd`).</summary>
     public string? WorkingDirectory { get; private set; }
@@ -142,7 +146,9 @@ internal sealed class TerminalSession : IDisposable
                 ? comSpec
                 : Path.Combine(Environment.SystemDirectory, "cmd.exe");
             info.FileName = executable;
-            info.Arguments = "/d /k \"chcp 65001>nul & prompt $P$G\"";
+            // `@echo off` is essential: with redirected stdin cmd.exe echoes every line it reads
+            // (including our sentinel probes), which would triple every command in the transcript.
+            info.Arguments = "/d /k \"chcp 65001>nul & prompt $P$G & @echo off\"";
         }
         return info;
     }
@@ -186,6 +192,7 @@ internal sealed class TerminalSession : IDisposable
             var token = Interlocked.Increment(ref _sentinelSequence);
             Interlocked.Exchange(ref _activeToken, token);
             Volatile.Write(ref _activeCommand, command);
+            _activeCommandStartedAt = DateTime.UtcNow;
             // A blank line first flushes any half-written prompt in the child console.
             WriteRaw($"\r\n{command}\r\n{CurrentDirectoryProbe(token)}\r\n{ExitCodeProbe(token)}\r\n");
         }
@@ -280,6 +287,9 @@ internal sealed class TerminalSession : IDisposable
             if (Interlocked.CompareExchange(ref _activeToken, 0, token) == token)
             {
                 Volatile.Write(ref _activeCommand, null);
+                var started = _activeCommandStartedAt;
+                _activeCommandStartedAt = null;
+                LastCommandDuration = started is null ? null : DateTime.UtcNow - started.Value;
                 if (command is not null) CommandCompleted?.Invoke(command, payload.Value.Length > 0 && int.TryParse(payload.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var exitCode) ? exitCode : -1);
             }
             return;

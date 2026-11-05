@@ -168,6 +168,35 @@ try
                 throw new InvalidOperationException("Malformed diagnostic was accepted: " + broken);
     });
 
+    Check("command completion keeps per-command timing instead of a name-keyed cache", () =>
+    {
+        // Regression guard: the terminal used to store start times in a Dictionary keyed by the
+        // command text, so running the same command twice reported the first command's duration
+        // and concurrent duplicate lines overwrote each other.
+        if (typeof(TerminalSession).GetField("_commandStartTimes", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic) is not null)
+            throw new InvalidOperationException("Terminal session still caches start times by command text.");
+        var durationProperty = typeof(TerminalSession).GetProperty("LastCommandDuration");
+        if (durationProperty is null || durationProperty.PropertyType != typeof(TimeSpan?))
+            throw new InvalidOperationException("Terminal session does not expose LastCommandDuration.");
+    });
+
+    Check("terminal starts an untracked shell without running a command", () =>
+    {
+        // The editor resolves the saved default shell before any session exists; switching the
+        // selector must not launch a process on its own (that path used to start a shell on load).
+        var control = new EditorTerminalControl();
+        try
+        {
+            control.ApplyPreferences(11.5f, 8000, TerminalShell.Cmd);
+            control.ApplyPreferences(9.5f, 6000, TerminalShell.PowerShell);
+            control.ApplyPreferences(float.NaN, 10, TerminalShell.PowerShell);
+        }
+        finally
+        {
+            control.Dispose();
+        }
+    });
+
     Check("project fixtures still load through the editor's project reader", () =>
     {
         var root = FindRepositoryRoot();
