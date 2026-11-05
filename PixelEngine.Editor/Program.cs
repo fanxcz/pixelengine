@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
@@ -14,23 +16,16 @@ internal static class Program
     {
         try
         {
-            WriteStartupLog("Starting PixelEngine 2.0 Studio.");
-#if DEBUG
-            Console.OutputEncoding = Encoding.UTF8;
-            Console.WriteLine("[PixelEngine] Starting editor...");
-            Console.WriteLine($"[PixelEngine] Startup log: {StartupLogPath}");
-#endif
+            ConfigureProcessForHighDpi();
+            WriteStartupLog($"Starting PixelEngine 2.0 Studio ({Environment.Version}, {RuntimeInformation.ProcessArchitecture}).");
+            StudioControlStyler.EnableApplicationDarkMode();
             ApplicationConfiguration.Initialize();
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+            Application.SetDefaultFont(Theme.Body(Theme.FontBody));
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-            Application.ThreadException += (_, eventArgs) =>
-            {
-                WriteStartupLog("Unhandled UI exception:", eventArgs.Exception);
-                MessageBox.Show(
-                    $"The editor encountered an unexpected error.\n\n{eventArgs.Exception.Message}\n\nFull details were saved to:\n{StartupLogPath}",
-                    "PixelEngine Studio error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            };
+            Application.ThreadException += (_, eventArgs) => ReportUnexpected("Unhandled UI exception:", eventArgs.Exception);
             AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
-                WriteStartupLog("Unhandled application exception:", eventArgs.ExceptionObject as Exception);
+                WriteStartupLog("Unhandled application exception:", eventArgs.ExceptionObject as Exception, showDialog: true);
             TaskScheduler.UnobservedTaskException += (_, eventArgs) =>
             {
                 WriteStartupLog("Unobserved background task exception:", eventArgs.Exception);
@@ -42,45 +37,68 @@ internal static class Program
             {
                 Environment.CurrentDirectory = repositoryRoot;
                 WriteStartupLog($"Repository: {repositoryRoot}");
-#if DEBUG
-                Console.WriteLine($"[PixelEngine] Repository: {repositoryRoot}");
-#endif
             }
 
             var projectPath = ResolveInitialProject(args, repositoryRoot);
             WriteStartupLog(projectPath is null
                 ? "No default LIC project found; editor will open without a project."
-                : $"Opening project: {projectPath}");
-#if DEBUG
-            Console.WriteLine(projectPath is null
-                ? "[PixelEngine] No default project found; opening empty editor."
-                : $"[PixelEngine] Opening project: {projectPath}");
-#endif
+                : $"Opening project: {projectPath}",
+                encodeDebug: true);
+
             using var form = new MainForm(projectPath);
-            form.Shown += (_, _) =>
-            {
-                WriteStartupLog("MainForm is visible.");
-#if DEBUG
-                Console.WriteLine("[PixelEngine] Editor window is visible.");
-#endif
-            };
+            form.Shown += (_, _) => WriteStartupLog("MainForm is visible.", encodeDebug: true);
             Application.Run(form);
             WriteStartupLog("Editor closed normally.");
-#if DEBUG
-            Console.WriteLine("[PixelEngine] Editor closed normally.");
-#endif
         }
         catch (Exception ex)
         {
             WriteStartupLog("Fatal startup error:", ex);
-#if DEBUG
-            Console.Error.WriteLine("[PixelEngine] Fatal startup error:");
-            Console.Error.WriteLine(ex);
-#endif
             MessageBox.Show(
-                $"PixelEngine Studio could not start.\n\n{ex}\n\nStartup log:\n{StartupLogPath}",
+                $"PixelEngine Studio could not start.\n\n{ex.Message}\n\nStartup log:\n{StartupLogPath}",
                 "PixelEngine startup failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>
+    /// Declares per-monitor DPI awareness before any window exists. Without this the OS
+    /// bitmap-stretches the whole editor on scaled displays, which blurs text and clips
+    /// dock content. Exceptions are ignored on older Windows versions that lack the API.
+    /// </summary>
+    private static void ConfigureProcessForHighDpi()
+    {
+        try { SetProcessDpiAwarenessContext(new IntPtr(-4)); } // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+        catch (DllNotFoundException) { }
+        catch (EntryPointNotFoundException) { }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+
+        if (DebugOutputEnabled)
+        {
+            try { Console.OutputEncoding = Encoding.UTF8; }
+            catch (IOException) { } // No console attached (WinExe).
+        }
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
+    private static bool DebugOutputEnabled
+    {
+        get
+        {
+#if DEBUG
+            return true;
+#else
+            return false;
+#endif
+        }
+    }
+
+    private static void ReportUnexpected(string context, Exception? exception)
+    {
+        WriteStartupLog(context, exception);
+        MessageBox.Show(
+            $"The editor encountered an unexpected error.\n\n{exception?.Message}\n\nFull details were saved to:\n{StartupLogPath}",
+            "PixelEngine Studio error", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 
     private static string? ResolveInitialProject(string[] args, string? repositoryRoot)
@@ -114,19 +132,33 @@ internal static class Program
         return null;
     }
 
-    private static void WriteStartupLog(string message, Exception? exception = null)
+    private static void WriteStartupLog(string message, Exception? exception = null, bool encodeDebug = false, bool showDialog = false)
     {
         try
         {
             var folder = Path.GetDirectoryName(StartupLogPath)!;
             Directory.CreateDirectory(folder);
-            var text = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
+            var text = string.Create(CultureInfo.InvariantCulture, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}");
             if (exception is not null) text += Environment.NewLine + exception;
-            File.AppendAllText(StartupLogPath, text + Environment.NewLine + Environment.NewLine, Encoding.UTF8);
+            var builder = new StringBuilder(text).AppendLine().AppendLine();
+            // Keep the log bounded so a long-lived session cannot grow without limit.
+            var existing = File.Exists(StartupLogPath) ? new FileInfo(StartupLogPath).Length : 0;
+            if (existing > 4 * 1024 * 1024) File.WriteAllText(StartupLogPath, string.Empty);
+            File.AppendAllText(StartupLogPath, builder.ToString(), Encoding.UTF8);
+            if (encodeDebug && DebugOutputEnabled) Console.WriteLine("[PixelEngine] " + message);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
             // Diagnostics must never prevent the editor from starting.
+        }
+        if (showDialog)
+        {
+            try
+            {
+                MessageBox.Show($"{message}\n\n{exception?.Message}\n\nLog: {StartupLogPath}",
+                    "PixelEngine", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
         }
     }
 }
