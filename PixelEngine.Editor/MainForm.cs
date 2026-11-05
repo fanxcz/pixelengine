@@ -1934,28 +1934,12 @@ public sealed class MainForm : Form
     {
         var normalizedLine = line.Trim();
         if (normalizedLine.Length == 0) return;
-        var match = Regex.Match(normalizedLine,
-            @"^(?<file>.+?)(?:\((?<line>\d+),(?<column>\d+)\)|:(?<line2>\d+):(?<column2>\d+)):\s*(?<severity>error|warning)\s+(?<code>[A-Z]+\d+):\s*(?<message>.*?)(?:\s+\[.*\])?$",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        if (!match.Success)
+        if (!BuildDiagnosticLineParser.TryParse(line, out var file, out var lineNumber, out var column, out var severity, out var code, out var message))
         {
-            if (isErrorOutput && !normalizedLine.StartsWith(">", StringComparison.Ordinal) && normalizedLine.Length < 400 &&
-                !normalizedLine.Contains("exit code", StringComparison.OrdinalIgnoreCase))
-            {
-                // Keep unparsable stderr visible in Problems so a failed command is never silent.
-                if (!_problemList.Items.Cast<ListViewItem>().Any(item => string.Equals(item.SubItems[3].Text, normalizedLine, StringComparison.Ordinal))) 
-                {
-                    var stderrRow = new ListViewItem("Error") { ForeColor = Theme.Danger };
-                    stderrRow.SubItems.Add("—");
-                    stderrRow.SubItems.Add("Terminal");
-                    stderrRow.SubItems.Add(normalizedLine);
-                    _problemList.Items.Add(stderrRow);
-                }
-            }
+            RecordUnparsedStderr(normalizedLine, isErrorOutput);
             return;
         }
 
-        var file = match.Groups["file"].Value.Trim();
         try
         {
             if (!Path.IsPathRooted(file) && FindRepositoryRoot() is { } root)
@@ -1966,28 +1950,47 @@ public sealed class MainForm : Form
             Log("Could not normalize compiler source path: " + ex.Message);
             return;
         }
-        var lineGroup = match.Groups["line"].Success ? match.Groups["line"] : match.Groups["line2"];
-        var columnGroup = match.Groups["column"].Success ? match.Groups["column"] : match.Groups["column2"];
-        var lineNumber = int.TryParse(lineGroup.Value, out var parsedLine) ? parsedLine : 1;
-        var column = int.TryParse(columnGroup.Value, out var parsedColumn) ? parsedColumn : 1;
-        var severity = match.Groups["severity"].Value;
+
         var isError = severity.Equals("error", StringComparison.OrdinalIgnoreCase);
-        var message = match.Groups["message"].Value.Trim();
-        var code = match.Groups["code"].Value;
-        // MSBuild repeats the same diagnostic per target; keep the Problems list unique.
+        // MSBuild repeats the same diagnostic once per referencing project; keep the list unique.
         foreach (ListViewItem existing in _problemList.Items)
         {
-            if (existing.Tag is BuildProblem prior && prior.Line == lineNumber && prior.Column == column &&
+            if (existing.Tag is not BuildProblem prior) continue;
+            if (prior.Line == lineNumber && prior.Column == column &&
                 string.Equals(prior.Code, code, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(prior.FilePath, file, StringComparison.OrdinalIgnoreCase)) return;
+                string.Equals(prior.FilePath, file, StringComparison.OrdinalIgnoreCase))
+            {
+                prior.Occurrences++;
+                existing.SubItems[3].Text = prior.Occurrences > 1 ? $"{prior.Message}  (×{prior.Occurrences})" : prior.Message;
+                return;
+            }
         }
-        var row = new ListViewItem(severity) { Tag = new BuildProblem(file, lineNumber, column, severity, code, message) };
+
+        var problem = new BuildProblem(file, lineNumber, column, severity, code, message);
+        var row = new ListViewItem(severity) { Tag = problem };
         row.SubItems.Add(code);
         row.SubItems.Add($"{Path.GetFileName(file)}:{lineNumber}:{column}");
         row.SubItems.Add(message);
         row.ForeColor = isError ? Theme.Danger : Theme.Warning;
         _problemList.Items.Add(row);
-        SetStatus($"Build {severity}: {code} · {Path.GetFileName(file)}:{lineNumber}");
+        SetStatus($"{(isError ? "Build error" : "Build warning")}: {code} · {Path.GetFileName(file)}:{lineNumber}");
+        // Jump to Problems only for genuine errors so a warning-heavy build stays unobtrusive.
+        if (isError && !_rootSplit.Panel2Collapsed && _bottomTabs.SelectedIndex != 1) _bottomTabs.SelectedIndex = 1;
+    }
+
+    /// <summary>Keeps unparsable stderr visible so a failed command is never silently ignored.</summary>
+    private void RecordUnparsedStderr(string normalizedLine, bool isErrorOutput)
+    {
+        if (!isErrorOutput || normalizedLine.Length >= 400) return;
+        if (normalizedLine.StartsWith('>') || normalizedLine.StartsWith("dotnet", StringComparison.OrdinalIgnoreCase)) return;
+        if (normalizedLine.Contains("exit code", StringComparison.OrdinalIgnoreCase)) return;
+        foreach (ListViewItem existing in _problemList.Items)
+            if (string.Equals(existing.SubItems[3].Text, normalizedLine, StringComparison.Ordinal)) return;
+        var row = new ListViewItem("stderr") { ForeColor = Theme.Danger };
+        row.SubItems.Add("—");
+        row.SubItems.Add("Terminal");
+        row.SubItems.Add(normalizedLine);
+        _problemList.Items.Add(row);
     }
 
     private void NavigateToSelectedProblem()
@@ -3606,7 +3609,13 @@ public sealed class MainForm : Form
 
 internal sealed record EditorLogEntry(DateTime Timestamp, string Category, string Message);
 internal sealed record EditorSearchHit(string Kind, object Target, string Preview);
-internal sealed record BuildProblem(string FilePath, int Line, int Column, string Severity, string Code, string Message);
+internal sealed record BuildProblem(string FilePath, int Line, int Column, string Severity, string Code, string Message)
+{
+    /// <summary>Number of times MSBuild/Roslyn reported the identical diagnostic.</summary>
+    public int Occurrences { get; set; } = 1;
+
+    public string ShortLocation => $"{Path.GetFileName(FilePath)}:{Line}:{Column}";
+}
 
 internal sealed class EditorDockLayout
 {

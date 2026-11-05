@@ -74,6 +74,16 @@ jobs:
           foreach ($line in ($failures | Select-Object -First 60)) { Write-Host "::error::$line" }
           if ($code -ne 0) { Write-Host "::error::Smoke tests exited with code $code"; exit 1 }
 
+      - name: Editor tests
+        shell: pwsh
+        run: |
+          $log = (& dotnet run --project .\PixelEngine.Editor.Tests\PixelEngine.Editor.Tests.csproj -c Release --no-build 2>&1 | Out-String)
+          $code = $LASTEXITCODE
+          Write-Host $log
+          $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*-\s' -or $_ -match '^FAIL' } | Select-Object -Unique
+          foreach ($line in ($failures | Select-Object -First 60)) { Write-Host "::error::$line" }
+          if ($code -ne 0) { Write-Host "::error::Editor tests exited with code $code"; exit 1 }
+
       - name: Smoke tests (Debug)
         shell: pwsh
         run: |

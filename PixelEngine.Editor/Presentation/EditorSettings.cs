@@ -61,13 +61,16 @@ internal sealed class EditorSettings
         "PixelEngine", "EditorSettings.json");
 
     /// <summary>Loads settings, repairing out-of-range values and ignoring unreadable files.</summary>
-    public static EditorSettings Load(out string? warning)
+    public static EditorSettings Load(out string? warning) => Load(SettingsFile, out warning);
+
+    /// <summary>Loads settings from an explicit path (used by tests and by the portable mode).</summary>
+    internal static EditorSettings Load(string path, out string? warning)
     {
         warning = null;
         try
         {
-            if (!File.Exists(SettingsFile)) return new EditorSettings();
-            var json = File.ReadAllText(SettingsFile);
+            if (!File.Exists(path)) return new EditorSettings();
+            var json = File.ReadAllText(path);
             var settings = JsonSerializer.Deserialize<EditorSettings>(json, JsonOptions) ?? new EditorSettings();
             settings.Normalize();
             return settings;
@@ -80,18 +83,22 @@ internal sealed class EditorSettings
     }
 
     /// <summary>Saves atomically. Returns false and reports the reason instead of throwing.</summary>
-    public bool TrySave(out string? error)
+    public bool TrySave(out string? error) => TrySave(SettingsFile, out error);
+
+    /// <summary>Saves to an explicit path atomically (used by tests).</summary>
+    internal bool TrySave(string path, out string? error)
     {
         error = null;
         try
         {
             Normalize();
-            var folder = Path.GetDirectoryName(SettingsFile)!;
+            var folder = Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(folder)) throw new IOException("The settings path has no folder.");
             Directory.CreateDirectory(folder);
-            var temporary = SettingsFile + ".tmp";
+            var temporary = path + ".tmp";
             File.WriteAllText(temporary, JsonSerializer.Serialize(this, JsonOptions));
             // Write-then-replace keeps the previous file intact if the process dies mid-write.
-            File.Move(temporary, SettingsFile, overwrite: true);
+            File.Move(temporary, path, overwrite: true);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
