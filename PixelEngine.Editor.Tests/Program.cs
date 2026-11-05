@@ -199,7 +199,7 @@ return 0;
 
 void CheckParse(string line, string expectedFile, int expectedLine, int expectedColumn, string expectedSeverity, string expectedCode)
 {
-    if (!BuildDiagnosticLineParser.TryParse(line, out var file, out var lineNumber, out var column, out var severity, out var code))
+    if (!BuildDiagnosticLineParser.TryParse(line, out var file, out var lineNumber, out var column, out var severity, out var code, out _))
         throw new InvalidOperationException("Diagnostic was not parsed: " + line);
     if (file != expectedFile || lineNumber != expectedLine || column != expectedColumn ||
         !string.Equals(severity, expectedSeverity, StringComparison.OrdinalIgnoreCase) || code != expectedCode)
