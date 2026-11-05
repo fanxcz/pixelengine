@@ -491,7 +491,22 @@ public static class ProjectDiagnostics
             var tileSize = Math.Clamp(map.TileSize, 1, 256);
             if (width != map.Width || height != map.Height)
             {
-                map.Resize(width, height);
+                // Copy the overlapping cells using the authored row stride before Resize()
+                // rewrites Width/Height; otherwise an oversized stride desynchronizes the
+                // authored cells from their (x, y) coordinates.
+                var oldStride = Math.Max(1, map.Width);
+                var authoredCells = map.Cells;
+                var target = new List<int>(new int[checked(width * height)]);
+                for (var y = 0; y < Math.Min(Math.Max(1, map.Height), height); y++)
+                for (var x = 0; x < Math.Min(oldStride, width); x++)
+                {
+                    var sourceIndex = (long)y * oldStride + x;
+                    if (sourceIndex < 0 || sourceIndex >= authoredCells.Count) continue;
+                    target[y * width + x] = authoredCells[(int)sourceIndex];
+                }
+                map.Width = width;
+                map.Height = height;
+                map.Cells = target;
                 fixes.Add($"Clamped dimensions on tile map {map.Name}.");
             }
             if (tileSize != map.TileSize) { map.TileSize = tileSize; fixes.Add($"Clamped tile size on map {map.Name}."); }

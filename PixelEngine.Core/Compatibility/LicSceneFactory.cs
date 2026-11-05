@@ -122,36 +122,48 @@ public static class LicSceneFactory
 
     private static void AddTileMapCollisionGeometry(GameScene scene, LicTileMapData map)
     {
-        // Merge equal horizontal spans across rows into larger static rectangles.
-        // A hard cap prevents adversarial checkerboard maps from creating hundreds of
+        // Merge solid cells into maximal static rectangles. Horizontal spans are extended
+        // downward while the identical span is solid; a span that was already covered by a
+        // taller run above is skipped so adjacent rows never emit duplicate geometry.
+        // This keeps a solid block as one collider instead of one collider per row, and a
+        // hard cap prevents adversarial checkerboard maps from creating hundreds of
         // thousands of GameObjects during project load.
         const int maximumStaticShapes = 8192;
-        var active = new Dictionary<(int X, int Width), int>();
         var finished = new List<(int X, int Y, int Width, int Height)>();
+        var covered = new bool[checked(map.Width * Math.Max(1, map.Height))];
         for (var y = 0; y < map.Height; y++)
         {
-            var rowSpans = new HashSet<(int X, int Width)>();
             var x = 0;
             while (x < map.Width)
             {
-                while (x < map.Width && map.GetCell(x, y) <= 0) x++;
+                while (x < map.Width && (map.GetCell(x, y) <= 0 || covered[y * map.Width + x])) x++;
                 if (x >= map.Width) break;
                 var start = x;
-                while (x < map.Width && map.GetCell(x, y) > 0) x++;
-                rowSpans.Add((start, x - start));
-            }
+                while (x < map.Width && map.GetCell(x, y) > 0 && !covered[y * map.Width + x]) x++;
+                var width = x - start;
 
-            foreach (var previous in active.Keys.ToArray())
-            {
-                if (rowSpans.Contains(previous)) continue;
-                finished.Add((previous.X, active[previous], previous.Width, y - active[previous]));
-                active.Remove(previous);
+                // Extend downward only while the complete span stays solid and uncovered.
+                var height = 1;
+                while (y + height < map.Height)
+                {
+                    var rowStart = (y + height) * map.Width;
+                    var rowIsSolid = true;
+                    for (var column = start; column < start + width; column++)
+                    {
+                        if (map.GetCell(column, y + height) <= 0 || covered[rowStart + column]) { rowIsSolid = false; break; }
+                    }
+                    if (!rowIsSolid) break;
+                    height++;
+                }
+
+                for (var row = y; row < y + height; row++)
+                for (var column = start; column < start + width; column++)
+                    covered[row * map.Width + column] = true;
+                finished.Add((start, y, width, height));
+                if (finished.Count > maximumStaticShapes) break;
             }
-            foreach (var span in rowSpans)
-                if (!active.ContainsKey(span)) active[span] = y;
+            if (finished.Count > maximumStaticShapes) break;
         }
-        foreach (var span in active)
-            finished.Add((span.Key.X, span.Value, span.Key.Width, map.Height - span.Value));
 
         var tileSize = Math.Clamp(map.TileSize, 1, 256);
         var count = Math.Min(finished.Count, maximumStaticShapes);
