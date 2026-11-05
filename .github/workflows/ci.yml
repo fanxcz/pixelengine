@@ -70,9 +70,9 @@ jobs:
           $log = (& dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Release --no-build -- . 2>&1 | Out-String)
           $code = $LASTEXITCODE
           Write-Host $log
-          $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*FAIL' } | Select-Object -Unique
-          foreach ($line in ($failures | Select-Object -First 40)) { Write-Host "::error::$line" }
-          if ($code -ne 0) { exit 1 }
+          $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*-\s' -or $_ -match 'FAIL' } | Select-Object -Unique
+          foreach ($line in ($failures | Select-Object -First 60)) { Write-Host "::error::$line" }
+          if ($code -ne 0) { Write-Host "::error::Smoke tests exited with code $code"; exit 1 }
 
       - name: Smoke tests (Debug)
         shell: pwsh
@@ -80,6 +80,6 @@ jobs:
           $log = (& dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Debug --no-build -- . 2>&1 | Out-String)
           $code = $LASTEXITCODE
           Write-Host $log
-          $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*FAIL' } | Select-Object -Unique
-          foreach ($line in ($failures | Select-Object -First 40)) { Write-Host "::error::$line" }
-          if ($code -ne 0) { exit 1 }
+          $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*-\s' -or $_ -match 'FAIL' } | Select-Object -Unique
+          foreach ($line in ($failures | Select-Object -First 60)) { Write-Host "::error::$line" }
+          if ($code -ne 0) { Write-Host "::error::Smoke tests exited with code $code"; exit 1 }
