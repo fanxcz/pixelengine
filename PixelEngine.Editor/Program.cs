@@ -33,13 +33,14 @@ internal static class Program
             };
 
             var repositoryRoot = FindRepositoryRoot();
-            if (repositoryRoot is not null)
-            {
-                Environment.CurrentDirectory = repositoryRoot;
-                WriteStartupLog($"Repository: {repositoryRoot}");
-            }
+            var workingDirectory = repositoryRoot ?? AppContext.BaseDirectory;
+            Environment.CurrentDirectory = workingDirectory;
+            WriteStartupLog(repositoryRoot is null
+                ? $"Packaged application directory: {workingDirectory}"
+                : $"Repository: {repositoryRoot}");
 
-            var projectPath = ResolveInitialProject(args, repositoryRoot);
+            var projectPath = EditorLaunchPaths.ResolveInitialProject(
+                args, repositoryRoot, AppContext.BaseDirectory, Environment.CurrentDirectory);
             WriteStartupLog(projectPath is null
                 ? "No default LIC project found; editor will open without a project."
                 : $"Opening project: {projectPath}",
@@ -99,22 +100,6 @@ internal static class Program
         MessageBox.Show(
             $"The editor encountered an unexpected error.\n\n{exception?.Message}\n\nFull details were saved to:\n{StartupLogPath}",
             "PixelEngine Studio error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-    }
-
-    private static string? ResolveInitialProject(string[] args, string? repositoryRoot)
-    {
-        var requested = args.FirstOrDefault(value => value.EndsWith(".lic", StringComparison.OrdinalIgnoreCase));
-        if (!string.IsNullOrWhiteSpace(requested))
-        {
-            var fullPath = Path.GetFullPath(requested);
-            if (!File.Exists(fullPath))
-                throw new FileNotFoundException("The requested LIC project does not exist.", fullPath);
-            return fullPath;
-        }
-
-        if (repositoryRoot is null) return null;
-        var demoPath = Path.Combine(repositoryRoot, "Lic", "demo.lic");
-        return File.Exists(demoPath) ? demoPath : null;
     }
 
     private static string? FindRepositoryRoot()
