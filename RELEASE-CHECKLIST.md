@@ -28,3 +28,9 @@ These are intentionally not represented as CI-passed:
 ## Release scope
 
 This is a **preview** for Windows x64, not a stable or feature-complete release. The runtime is 2D. Lua scripts run through MoonSharp SoftSandbox; C# scripts remain editable source and are not executed by the current Player. The integrated terminal is not a full VT100/ANSI implementation.
+
+## Preview 2 link validation
+
+- The repository README and website CTAs point directly to `/releases/tag/v2.0.0-preview.2`.
+- The release ZIP contains the same README and website files, plus the standalone Windows Studio and Player executables.
+- The release pipeline publishes a SHA-256 checksum alongside the ZIP.
