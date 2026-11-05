@@ -2,6 +2,8 @@
 
 ## Automated release gate
 
+This revision also fixes all download links to target the actual preview release instead of GitHub's stable-only `releases/latest` endpoint.
+
 The GitHub Actions release workflow runs on Windows x64 and must complete all of these steps before publishing the GitHub Release:
 
 - Restore the .NET 8 solution.
