@@ -72,7 +72,9 @@ jobs:
           $playerExe = Join-Path $playerDir 'PixelEngine.Sandbox.exe'
           $licDir = Join-Path $editorDir 'Lic'
           $demoFile = Join-Path $licDir 'demo.lic'
-          foreach ($required in @($editorExe, $playerExe, $demoFile)) {
+          $siteIndex = Join-Path (Get-Location).Path 'docs\index.html'
+          $siteStyles = Join-Path (Get-Location).Path 'docs\style.css'
+          foreach ($required in @($editorExe, $playerExe, $demoFile, $siteIndex, $siteStyles)) {
             if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
               throw "Required release file is missing: $required"
             }
@@ -81,6 +83,7 @@ jobs:
           Copy-Item -LiteralPath $editorExe -Destination $packageDir
           Copy-Item -LiteralPath $playerExe -Destination $packageDir
           Copy-Item -LiteralPath $licDir -Destination (Join-Path $packageDir 'Lic') -Recurse
+          Copy-Item -LiteralPath 'docs' -Destination (Join-Path $packageDir 'Website') -Recurse
           Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $packageDir 'README.md')
           Copy-Item -LiteralPath 'RELEASE-README.txt' -Destination (Join-Path $packageDir 'README.txt')
           Copy-Item -LiteralPath 'RELEASE-NOTES-v2.0.0-preview.1.md' -Destination (Join-Path $packageDir 'RELEASE-NOTES.md')
