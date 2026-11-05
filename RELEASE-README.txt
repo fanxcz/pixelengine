@@ -1,4 +1,4 @@
-PIXELENGINE 2.0.0-PREVIEW.1 — WINDOWS X64
+PIXELENGINE 2.0.0-PREVIEW.2 — WINDOWS X64
 
 INSTALL
 1. Extract the entire ZIP archive into its own folder.
@@ -31,4 +31,4 @@ NOTES
 - Startup logs: %LOCALAPPDATA%\PixelEngine\Logs\
 
 Official repository: https://github.com/fanxcz/pixelengine
-Releases: https://github.com/fanxcz/pixelengine/releases
+Release: https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.2
