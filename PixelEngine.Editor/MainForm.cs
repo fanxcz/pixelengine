@@ -3191,34 +3191,55 @@ public sealed class MainForm : Form
             return;
         }
         StopPreview();
-        var root = FindRepositoryRoot();
-        var sandbox = root is null ? null : Path.Combine(root, "PixelEngine.Sandbox", "PixelEngine.Sandbox.csproj");
-        if (sandbox is null || !File.Exists(sandbox))
+        var projectPath = _projectPath;
+        if (string.IsNullOrWhiteSpace(projectPath) || !File.Exists(projectPath))
         {
-            MessageBox.Show(this, "PixelEngine.Sandbox.csproj was not found. Run the editor from the source repository folder.", "Sandbox not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "Save the project to disk before starting the Game preview.", "Project path required", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
+
+        var applicationDirectory = AppContext.BaseDirectory;
+        var bundledPlayer = EditorLaunchPaths.FindBundledPlayer(applicationDirectory);
+        var root = FindRepositoryRoot();
+        var sandboxProject = root is null ? null : Path.Combine(root, "PixelEngine.Sandbox", "PixelEngine.Sandbox.csproj");
+        if (bundledPlayer is null && (sandboxProject is null || !File.Exists(sandboxProject)))
+        {
+            MessageBox.Show(this,
+                "The PixelEngine Player was not found. Reinstall the complete release package, or run the editor from the source repository with the .NET 8 SDK installed.",
+                "Player not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         try
         {
-            // Do not reparent the MonoGame HWND. The player is a normal independent
-            // desktop window with its own border, resize/maximize controls and input focus.
-            var start = new ProcessStartInfo("dotnet")
+            // Release packages ship a self-contained Player beside the Studio executable.
+            // Developer builds fall back to dotnet run from the source repository.
+            ProcessStartInfo start;
+            if (bundledPlayer is not null)
             {
-                WorkingDirectory = root,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            start.ArgumentList.Add("run");
-            start.ArgumentList.Add("--project");
-            start.ArgumentList.Add(sandbox);
-            start.ArgumentList.Add("--");
-            var projectPath = _projectPath;
-            if (string.IsNullOrWhiteSpace(projectPath) || !File.Exists(projectPath))
+                start = new ProcessStartInfo(bundledPlayer)
+                {
+                    WorkingDirectory = applicationDirectory,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+            }
+            else
             {
-                MessageBox.Show(this, "Save the project to disk before starting the Game preview.", "Project path required", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
+                start = new ProcessStartInfo("dotnet")
+                {
+                    WorkingDirectory = root!,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                start.ArgumentList.Add("run");
+                start.ArgumentList.Add("--project");
+                start.ArgumentList.Add(sandboxProject!);
+                start.ArgumentList.Add("--");
             }
             start.ArgumentList.Add(projectPath);
             _previewProcess = Process.Start(start) ?? throw new InvalidOperationException("Could not start MonoGame Player.");
@@ -3267,7 +3288,7 @@ public sealed class MainForm : Form
             _previewProcess.BeginErrorReadLine();
             _gamePlaceholder.Text = "The game is running in its own resizable window.\n\nF5   Restart player\nShift+F5   Stop player\n\nYou can keep editing while the player window is open.";
             SetPlayerState("● RUNNING — player window is open", Theme.Success);
-            AppendPlayerLog($"launch: dotnet {string.Join(' ', start.ArgumentList)}", isError: false);
+            AppendPlayerLog($"launch: {start.FileName} {string.Join(' ', start.ArgumentList)}", isError: false);
             Log("Launched MonoGame player window: " + Path.GetFileName(_projectPath));
             SetStatus("Game running in separate window");
             UpdateProjectActionButtons();
