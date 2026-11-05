@@ -2,13 +2,13 @@
 
 **PixelEngine** — 2D game engine with a Windows Studio editor, a separate MonoGame player and editable LIC projects. The repository includes the engine, authoring environment, sample projects and automated checks.
 
-[Сайт проекта](https://fanxcz.github.io/pixelengine/) · [Скачать релиз](https://github.com/fanxcz/pixelengine/releases/latest) · [Исходный код](https://github.com/fanxcz/pixelengine)
+[Сайт проекта](https://fanxcz.github.io/pixelengine/) · [Скачать релиз](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.2) · [Исходный код](https://github.com/fanxcz/pixelengine)
 
-> **Текущая версия:** v2.0.0-preview.1 — предварительная сборка для Windows x64. Это preview, а не заявление о завершённом 3D-движке или полном паритете со старой игрой.
+> **Текущая версия:** v2.0.0-preview.2 — предварительная сборка для Windows x64. Это preview, а не заявление о завершённом 3D-движке или полном паритете со старой игрой.
 
 ## Скачать и запустить
 
-1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases/latest) и скачайте архив PixelEngine-v2.0.0-preview.1-win-x64.zip.
+1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.2) и скачайте архив PixelEngine-v2.0.0-preview.2-win-x64.zip.
 2. Распакуйте архив целиком в отдельную папку. Не удаляйте каталог Lic: в нём лежат демонстрационные проекты.
 3. Запустите PixelEngine.Editor.exe. При первом старте редактор автоматически откроет Lic/demo.lic.
 4. Нажмите **F5**, чтобы запустить игру в отдельном окне. **Shift+F5** останавливает Player. Полная версия статического сайта проекта также включена в архив в каталоге `Website/`.
