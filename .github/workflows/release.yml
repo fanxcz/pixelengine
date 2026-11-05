@@ -1,0 +1,132 @@
+name: PixelEngine Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+
+jobs:
+  build-test-package:
+    if: github.repository == 'fanxcz/pixelengine'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore solution
+        shell: pwsh
+        run: dotnet restore .\PixelEngine.sln
+
+      - name: Build Release
+        shell: pwsh
+        run: dotnet build .\PixelEngine.sln -c Release --no-restore
+
+      - name: Runtime smoke tests
+        shell: pwsh
+        run: dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Release --no-build -- .
+
+      - name: Editor headless tests
+        shell: pwsh
+        run: dotnet run --project .\PixelEngine.Editor.Tests\PixelEngine.Editor.Tests.csproj -c Release --no-build
+
+      - name: Publish self-contained Studio
+        shell: pwsh
+        run: |
+          dotnet publish .\PixelEngine.Editor\PixelEngine.Editor.csproj --configuration Release --runtime win-x64 --self-contained true --output "$env:RUNNER_TEMP\pixelengine\editor" -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false
+
+      - name: Publish self-contained Player
+        shell: pwsh
+        run: |
+          dotnet publish .\PixelEngine.Sandbox\PixelEngine.Sandbox.csproj --configuration Release --runtime win-x64 --self-contained true --output "$env:RUNNER_TEMP\pixelengine\player" -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false
+
+      - name: Assemble release ZIP and SHA-256
+        id: package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $editorDir = Join-Path $env:RUNNER_TEMP 'pixelengine\editor'
+          $playerDir = Join-Path $env:RUNNER_TEMP 'pixelengine\player'
+          $packageDir = Join-Path $env:RUNNER_TEMP 'pixelengine\package'
+          New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+
+          $editorExe = Join-Path $editorDir 'PixelEngine.Editor.exe'
+          $playerExe = Join-Path $playerDir 'PixelEngine.Sandbox.exe'
+          $licDir = Join-Path $editorDir 'Lic'
+          $demoFile = Join-Path $licDir 'demo.lic'
+          foreach ($required in @($editorExe, $playerExe, $demoFile)) {
+            if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+              throw "Required release file is missing: $required"
+            }
+          }
+
+          Copy-Item -LiteralPath $editorExe -Destination $packageDir
+          Copy-Item -LiteralPath $playerExe -Destination $packageDir
+          Copy-Item -LiteralPath $licDir -Destination (Join-Path $packageDir 'Lic') -Recurse
+          Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $packageDir 'README.md')
+          Copy-Item -LiteralPath 'RELEASE-README.txt' -Destination (Join-Path $packageDir 'README.txt')
+          Copy-Item -LiteralPath 'RELEASE-NOTES-v2.0.0-preview.1.md' -Destination (Join-Path $packageDir 'RELEASE-NOTES.md')
+
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $version = $env:GITHUB_REF_NAME
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:HEAD_COMMIT_MESSAGE -eq 'release: v2.0.0-preview.1') {
+            $version = 'v2.0.0-preview.1'
+          } else {
+            $version = 'preview-' + $env:GITHUB_SHA.Substring(0, 7)
+          }
+
+          $zipName = "PixelEngine-$version-win-x64.zip"
+          $zipPath = Join-Path $env:RUNNER_TEMP $zipName
+          if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+          Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
+          $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksumPath = "$zipPath.sha256"
+          "$hash  $zipName" | Set-Content -LiteralPath $checksumPath -Encoding ASCII
+
+          "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "zip_name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "checksum_path=$checksumPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload release package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.zip_name }}
+          path: |
+            ${{ steps.package.outputs.zip_path }}
+            ${{ steps.package.outputs.checksum_path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.head_commit.message == 'release: v2.0.0-preview.1')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.package.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: PixelEngine ${{ steps.package.outputs.version }}
+          body_path: RELEASE-NOTES-v2.0.0-preview.1.md
+          prerelease: true
+          make_latest: false
+          files: |
+            ${{ steps.package.outputs.zip_path }}
+            ${{ steps.package.outputs.checksum_path }}
+          fail_on_unmatched_files: true
