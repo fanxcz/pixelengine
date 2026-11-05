@@ -150,7 +150,7 @@ try
                      "MSBUILD : error MSB1009: Project file does not exist."
                  })
         {
-            if (BuildDiagnosticLineParser.TryParse(nonDiagnostic, out _, out _, out _, out _, out _))
+            if (BuildDiagnosticLineParser.TryParse(nonDiagnostic, out _, out _, out _, out _, out _, out _))
                 throw new InvalidOperationException("Non-diagnostic line was parsed as a compiler diagnostic: " + nonDiagnostic);
         }
     });
@@ -164,7 +164,7 @@ try
                      "Game.cs(12,4): error CS0001",
                      "Game.cs(12,4): fatal CS0001: not an error/warning"
                  })
-            if (BuildDiagnosticLineParser.TryParse(broken, out _, out _, out _, out _, out _))
+            if (BuildDiagnosticLineParser.TryParse(broken, out _, out _, out _, out _, out _, out _))
                 throw new InvalidOperationException("Malformed diagnostic was accepted: " + broken);
     });
 
