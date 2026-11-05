@@ -12,6 +12,7 @@ using PixelEngine.Tilemaps;
 using PixelEngine.Physics;
 using PixelEngine.Input;
 using PixelEngine.Audio;
+using PixelEngine.Storage;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework;
 
