@@ -3053,7 +3053,7 @@ public sealed class MainForm : Form
             _previewProcess.BeginErrorReadLine();
             _gamePlaceholder.Text = "The game is running in its own resizable window.\n\nF5   Restart player\nShift+F5   Stop player\n\nYou can keep editing while the player window is open.";
             SetPlayerState("● RUNNING — player window is open", Theme.Success);
-            AddPlayerLog($"launch: dotnet {string.Join(' ', start.ArgumentList)}");
+            AppendPlayerLog($"launch: dotnet {string.Join(' ', start.ArgumentList)}", isError: false);
             Log("Launched MonoGame player window: " + Path.GetFileName(_projectPath));
             SetStatus("Game running in separate window");
             UpdateProjectActionButtons();

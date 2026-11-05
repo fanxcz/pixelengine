@@ -368,7 +368,7 @@ internal sealed class DarkTreeViewDrawer : IDisposable
         var graphics = e.Graphics;
         var bounds = e.Bounds;
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
-        var rowWidth = Math.Max(bounds.Width + bounds.Left, _tree.ClientSize.Width - bounds.Left);
+        var rowWidth = Math.Max(bounds.Width + bounds.Left, Math.Max(0, _tree.ClientSize.Width - bounds.Left));
         var row = new Rectangle(0, bounds.Y, Math.Max(1, _tree.ClientSize.Width), bounds.Height);
         var selected = (e.State & TreeNodeStates.Selected) != 0;
         var hot = (e.State & TreeNodeStates.Hot) != 0;

@@ -76,7 +76,6 @@ internal sealed class EditorTerminalControl : UserControl
     private TerminalShell _activeShell = TerminalShell.PowerShell;
     private int _historyIndex;
     private bool _disposed;
-    private bool _suppressFlush;
     private TerminalSession? _runningSession;
 
     public Func<string>? WorkingDirectoryProvider { get; set; }
@@ -370,16 +369,14 @@ internal sealed class EditorTerminalControl : UserControl
         }
         var atBottom = IsScrolledToBottom();
         _output.SuspendLayout();
-        _suppressFlush = true;
         try
         {
-            foreach (var (text, isError) in batch) AppendLineCore(text, isError);
+            foreach (var (text, isError) in batch) AppendLineCore(text, isError, LineStyle.Plain);
             if (_lines.Count > MaximumBufferedLines) TrimTranscript();
             if (atBottom) ScrollToEnd();
         }
         finally
         {
-            _suppressFlush = false;
             _output.ResumeLayout();
         }
         UpdateState();
@@ -626,7 +623,7 @@ internal sealed class EditorTerminalControl : UserControl
             pending = _pendingOutput.ToArray();
             _pendingOutput.Clear();
         }
-        foreach (var line in pending) AppendLineCore(line.Text, line.IsError);
+        foreach (var line in pending) AppendLineCore(line.Text, line.IsError, LineStyle.Plain);
         if (pending.Length > 0) ScrollToEnd();
         UpdateState();
     }

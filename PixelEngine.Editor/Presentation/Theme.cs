@@ -106,7 +106,7 @@ internal static class Theme
                 _dpi = Math.Clamp(control.DeviceDpi, 96, 384);
                 return;
             }
-            using var screen = Graphics.FromHwnd(IntPtr.Zero);
+            using var screen = System.Drawing.Graphics.FromHwnd(IntPtr.Zero);
             _dpi = Math.Clamp((int)Math.Round(screen.DpiY), 96, 384);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.Runtime.InteropServices.ExternalException)

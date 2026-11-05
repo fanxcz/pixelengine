@@ -124,7 +124,7 @@ internal sealed class StudioToolStripRenderer : ToolStripRenderer
             bounds = new Rectangle(0, 0, e.Item.Width, e.Item.Height);
             flags |= TextFormatFlags.HorizontalCenter;
         }
-        TextRenderer.DrawText(e.Graphics, text, e.TextFont, bounds, color, e.ToolStrip.BackColor, flags);
+        TextRenderer.DrawText(e.Graphics, text, e.TextFont, bounds, color, e.ToolStrip?.BackColor ?? Theme.Toolbar, flags);
     }
 
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
