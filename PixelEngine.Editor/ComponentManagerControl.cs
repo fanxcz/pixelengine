@@ -7,14 +7,14 @@ namespace PixelEngine.Editor;
 /// <summary>Object component stack with an editable inspector and deterministic ordering.</summary>
 internal sealed class ComponentManagerControl : UserControl
 {
-    private readonly ComboBox _types = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 145 };
-    private readonly Button _add = new() { Text = "+ Add", Width = 62 };
-    private readonly Button _up = new() { Text = "↑", Width = 32 };
-    private readonly Button _down = new() { Text = "↓", Width = 32 };
-    private readonly Button _reset = new() { Text = "Reset", Width = 54 };
-    private readonly Button _duplicate = new() { Text = "Copy", Width = 52 };
+    private readonly ComboBox _types = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = Theme.Px(150) };
+    private readonly Button _add = new() { Text = "+ Add", Width = Theme.Px(66) };
+    private readonly Button _up = new() { Text = "↑", Width = Theme.Px(34) };
+    private readonly Button _down = new() { Text = "↓", Width = Theme.Px(34) };
+    private readonly Button _reset = new() { Text = "Reset", Width = Theme.Px(58) };
+    private readonly Button _duplicate = new() { Text = "Copy", Width = Theme.Px(56) };
     private readonly ToolTip _toolTips = new();
-    private readonly Button _remove = new() { Text = "Remove", Width = 62 };
+    private readonly Button _remove = new() { Text = "Remove", Width = Theme.Px(66) };
     private readonly ListBox _components = new();
     private readonly PropertyGrid _properties = new();
     private LicObjectData? _target;
@@ -38,9 +38,9 @@ internal sealed class ComponentManagerControl : UserControl
         _toolTips.SetToolTip(_down, "Move component down");
         _toolTips.SetToolTip(_reset, "Reset selected component to its defaults");
         _toolTips.SetToolTip(_duplicate, "Duplicate selected component, including extension fields");
-        var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, Padding = new Padding(4), BackColor = Theme.Toolbar, WrapContents = false, AutoScroll = true };
+        var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.Px(40), Padding = new Padding(Theme.Px(4)), BackColor = Theme.Toolbar, WrapContents = false, AutoScroll = true };
         tools.Controls.AddRange([_types, _add, _up, _down, _duplicate, _reset, _remove]);
-        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 142, BackColor = Theme.Panel, FixedPanel = FixedPanel.Panel1 };
+        var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = Theme.Panel, FixedPanel = FixedPanel.Panel1, SplitterWidth = Theme.Px(6) };
         _components.Dock = DockStyle.Fill;
         _components.BackColor = Theme.Viewport;
         _components.ForeColor = Theme.Text;
@@ -68,7 +68,17 @@ internal sealed class ComponentManagerControl : UserControl
         _properties.CategoryForeColor = Theme.Muted;
         _properties.HelpBackColor = Theme.Panel;
         _properties.HelpForeColor = Theme.Text;
-        _properties.LineColor = Color.FromArgb(58, 64, 75);
+        _properties.LineColor = Theme.Border;
+        // DPI-aware proportions: the splitter distance must be applied after the control has a
+        // handle, otherwise WinForms clamps it against the design-time size and clips the list.
+        split.HandleCreated += (_, _) =>
+        {
+            var desired = Math.Max(Theme.Px(120), split.Height * 2 / 5);
+            if (desired < split.Height - Theme.Px(140))
+                split.SplitterDistance = desired;
+        };
+        split.Panel1MinSize = Theme.Px(90);
+        split.Panel2MinSize = Theme.Px(120);
         split.Panel1.Controls.Add(_components);
         split.Panel2.Controls.Add(_properties);
         Controls.Add(split);

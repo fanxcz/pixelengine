@@ -33,6 +33,14 @@ internal static class Theme
     public static readonly Color Border = Color.FromArgb(0x26, 0x2D, 0x3A);
     /// <summary>Stronger divider.</summary>
     public static readonly Color BorderStrong = Color.FromArgb(0x33, 0x3C, 0x4D);
+    /// <summary>Hairline used inside dense grids where a full-strength border would be noisy.</summary>
+    public static readonly Color BorderSoft = Color.FromArgb(0x1C, 0x22, 0x2D);
+    /// <summary>Raised surface one step above <see cref="Panel"/> (toolbars inside panels).</summary>
+    public static readonly Color PanelAlt = Color.FromArgb(0x1B, 0x20, 0x2B);
+    /// <summary>Semantic alias: the application background.</summary>
+    public static readonly Color Background = Window;
+    /// <summary>Semantic alias: a neutral field background.</summary>
+    public static readonly Color Field = Viewport;
 
     // ── Accents & semantic colours ──────────────────────────────────────────────
     public static readonly Color Accent = Color.FromArgb(0x6E, 0x8B, 0xFF);
