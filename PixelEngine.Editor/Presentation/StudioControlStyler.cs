@@ -366,6 +366,7 @@ internal sealed class DarkTreeViewDrawer : IDisposable
     private void OnDrawNode(object? sender, DrawTreeNodeEventArgs e)
     {
         var graphics = e.Graphics;
+        if (graphics is null || e.Node is null) return;
         var bounds = e.Bounds;
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
         var rowWidth = Math.Max(bounds.Width + bounds.Left, Math.Max(0, _tree.ClientSize.Width - bounds.Left));
