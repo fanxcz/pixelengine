@@ -144,7 +144,8 @@ public sealed class PersistentSaveStore
         }
         finally
         {
-            try { if (File.Exists(temporary)) File.Delete(temporary); } catch { }
+            try { if (File.Exists(temporary)) File.Delete(temporary); }
+            catch (Exception ex) { Console.Error.WriteLine($"[PersistentSaveStore] Could not delete '{temporary}': {ex.Message}"); }
         }
     }
 

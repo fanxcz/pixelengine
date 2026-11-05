@@ -175,17 +175,33 @@ public sealed class AssetStore : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        foreach (var atlas in _atlases.Values) atlas.Dispose();
+        foreach (var atlas in _atlases.Values)
+        {
+            try { atlas.Dispose(); }
+            catch (Exception ex) { Console.Error.WriteLine($"[AssetStore] Could not dispose atlas: {ex.Message}"); }
+        }
         _atlases.Clear();
-        foreach (var texture in _textures.Values) texture.Dispose();
+        foreach (var texture in _textures.Values)
+        {
+            try { texture.Dispose(); }
+            catch (Exception ex) { Console.Error.WriteLine($"[AssetStore] Could not dispose texture: {ex.Message}"); }
+        }
         _textures.Clear();
         foreach (var instance in _soundInstances)
         {
-            try { instance.Stop(); } catch { }
-            instance.Dispose();
+            // Raylib throws if a sound is already stopped or the audio device is gone during
+            // shutdown; disposal is best-effort and must never take the process down.
+            try { instance.Stop(); }
+            catch (Exception ex) { Console.Error.WriteLine($"[AssetStore] Could not stop sound instance: {ex.Message}"); }
+            try { instance.Dispose(); }
+            catch (Exception ex) { Console.Error.WriteLine($"[AssetStore] Could not dispose sound instance: {ex.Message}"); }
         }
         _soundInstances.Clear();
-        foreach (var sound in _sounds.Values) sound.Dispose();
+        foreach (var sound in _sounds.Values)
+        {
+            try { sound.Dispose(); }
+            catch (Exception ex) { Console.Error.WriteLine($"[AssetStore] Could not dispose sound: {ex.Message}"); }
+        }
         _sounds.Clear();
         WhitePixel.Dispose();
     }

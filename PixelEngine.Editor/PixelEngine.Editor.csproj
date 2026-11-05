@@ -11,6 +11,9 @@
     <RootNamespace>PixelEngine.Editor</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="PixelEngine.Editor.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\PixelEngine.Core\PixelEngine.Core.csproj" />
     <None Include="..\Lic\**\*.lic" Link="Lic\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

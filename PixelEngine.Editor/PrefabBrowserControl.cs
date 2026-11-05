@@ -6,9 +6,9 @@ namespace PixelEngine.Editor;
 /// <summary>Prefab library dock. Instances are linked by prefab name; template updates can propagate to instances.</summary>
 internal sealed class PrefabBrowserControl : UserControl
 {
-    private readonly TextBox _filter = new() { Width = 155, BorderStyle = BorderStyle.FixedSingle };
+    private readonly TextBox _filter = new() { Width = Theme.Px(160), BorderStyle = BorderStyle.FixedSingle };
     private readonly ListBox _items = new();
-    private readonly Label _details = new() { Dock = DockStyle.Bottom, Height = 42, ForeColor = Theme.Muted, TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+    private readonly Label _details = new() { Dock = DockStyle.Bottom, Height = Theme.Px(48), ForeColor = Theme.Muted, TextAlign = System.Drawing.ContentAlignment.MiddleLeft, Padding = new Padding(Theme.Px(6), 0, Theme.Px(6), 0) };
     private readonly Button _create = new() { Text = "Create from object" };
     private readonly Button _duplicate = new() { Text = "Duplicate" };
     private readonly Button _rename = new() { Text = "Rename" };
@@ -41,8 +41,8 @@ internal sealed class PrefabBrowserControl : UserControl
         BackColor = Theme.Panel;
         _filter.BackColor = Theme.Viewport;
         _filter.ForeColor = Theme.Text;
-        var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 96, BackColor = Theme.Toolbar, Padding = new Padding(5), WrapContents = true, AutoScroll = true };
-        tools.Controls.Add(new Label { Text = "Filter", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(4, 8, 2, 0) });
+        var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.Px(104), BackColor = Theme.Toolbar, Padding = new Padding(Theme.Px(5)), WrapContents = true, AutoScroll = true };
+        tools.Controls.Add(new Label { Text = "Filter", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(Theme.Px(4), Theme.Px(8), Theme.Px(2), 0) });
         tools.Controls.Add(_filter);
         tools.Controls.AddRange([_create, _duplicate, _rename, _editTemplate, _update, _propagate, _instantiate, _remove]);
         _items.Dock = DockStyle.Fill;

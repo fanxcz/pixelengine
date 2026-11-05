@@ -9,8 +9,8 @@ namespace PixelEngine.Editor;
 internal sealed class AssetBrowserControl : UserControl
 {
     private readonly ListView _items = new() { View = View.Details, FullRowSelect = true, HideSelection = false, MultiSelect = false, BorderStyle = BorderStyle.None };
-    private readonly TextBox _search = new() { Width = 108, BorderStyle = BorderStyle.FixedSingle };
-    private readonly ComboBox _typeFilter = new() { Width = 88, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly TextBox _search = new() { Width = Theme.Px(118), BorderStyle = BorderStyle.FixedSingle };
+    private readonly ComboBox _typeFilter = new() { Width = Theme.Px(98), DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _usedOnly = new() { Text = "Used only", AutoSize = true, ForeColor = Theme.Muted, BackColor = Theme.Toolbar, Margin = new Padding(5, 7, 5, 0) };
     private readonly PictureBox _preview = new();
     private readonly Label _details = new();
@@ -46,22 +46,22 @@ internal sealed class AssetBrowserControl : UserControl
 
         // Compact two-row FileSystem toolbar: filters remain visible in a narrow dock,
         // while asset actions scroll horizontally instead of wrapping into tall stacks.
-        var toolbar = new Panel { Dock = DockStyle.Top, Height = 66, BackColor = Theme.Toolbar };
+        var toolbar = new Panel { Dock = DockStyle.Top, Height = Theme.Px(68), BackColor = Theme.Toolbar };
         var filters = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top, Height = 31, Padding = new Padding(5, 3, 3, 1),
+            Dock = DockStyle.Top, Height = Theme.Px(33), Padding = new Padding(Theme.Px(5), Theme.Px(3), Theme.Px(3), Theme.Px(1)),
             BackColor = Theme.Toolbar, WrapContents = false, AutoScroll = true
         };
         var actions = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top, Height = 34, Padding = new Padding(4, 1, 3, 1),
+            Dock = DockStyle.Top, Height = Theme.Px(36), Padding = new Padding(Theme.Px(4), Theme.Px(1), Theme.Px(3), Theme.Px(1)),
             BackColor = Theme.Toolbar, WrapContents = false, AutoScroll = true
         };
         var searchLabel = new Label { Text = "Filter", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(2, 5, 2, 0) };
         _search.BackColor = Theme.Viewport;
         _search.ForeColor = Theme.Text;
-        _search.Height = 23;
-        _typeFilter.Height = 24;
+        _search.Height = Theme.Px(24);
+        _typeFilter.Height = Theme.Px(25);
         _usedOnly.Margin = new Padding(3, 5, 3, 0);
         filters.Controls.Add(searchLabel);
         filters.Controls.Add(_search);
@@ -69,9 +69,9 @@ internal sealed class AssetBrowserControl : UserControl
         filters.Controls.Add(_usedOnly);
         foreach (var button in new[] { _import, _rename, _assign, _export, _playAudio, _stopAudio, _remove })
         {
-            button.Height = 27;
-            button.Margin = new Padding(2, 1, 2, 1);
-            button.Padding = new Padding(5, 0, 5, 0);
+            button.Height = Theme.Px(28);
+            button.Margin = new Padding(Theme.Px(2), Theme.Px(1), Theme.Px(2), Theme.Px(1));
+            button.Padding = new Padding(Theme.Px(6), 0, Theme.Px(6), 0);
             actions.Controls.Add(button);
         }
         toolbar.Controls.Add(actions);
@@ -112,12 +112,12 @@ internal sealed class AssetBrowserControl : UserControl
         split.HandleCreated += (_, _) => UpdatePreviewDock();
         split.Resize += (_, _) => UpdatePreviewDock();
         split.Panel1.Controls.Add(_items);
-        var previewPanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Viewport, Padding = new Padding(8) };
+        var previewPanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Viewport, Padding = new Padding(Theme.Px(8)) };
         _preview.Dock = DockStyle.Fill;
         _preview.SizeMode = PictureBoxSizeMode.Zoom;
         _preview.BackColor = Color.FromArgb(25, 28, 34);
         _details.Dock = DockStyle.Bottom;
-        _details.Height = 46;
+        _details.Height = Theme.Px(48);
         _details.ForeColor = Theme.Muted;
         _details.TextAlign = ContentAlignment.MiddleLeft;
         previewPanel.Controls.Add(_preview);

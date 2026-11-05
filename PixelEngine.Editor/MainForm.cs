@@ -19,11 +19,11 @@ public sealed class MainForm : Form
     private readonly AssetBrowserControl _assetBrowser = new();
     private readonly PrefabBrowserControl _prefabBrowser = new();
     private readonly ComponentManagerControl _componentManager = new();
-    private readonly TabControl _centerTabs = new();
-    private readonly TabControl _scriptTabs = new();
-    private readonly TabControl _inspectorTabs = new();
-    private readonly TabControl _explorerTabs = new();
-    private readonly TabControl _bottomTabs = new();
+    private readonly StudioTabControl _centerTabs = new();
+    private readonly StudioTabControl _scriptTabs = new();
+    private readonly StudioTabControl _inspectorTabs = new();
+    private readonly StudioTabControl _explorerTabs = new();
+    private readonly StudioTabControl _bottomTabs = new();
     private TabPage? _sceneDocumentTab;
     private readonly ListView _problemList = new() { View = View.Details, FullRowSelect = true, HideSelection = false, BorderStyle = BorderStyle.None, MultiSelect = false };
     private readonly TextBox _projectSearchBox = new() { BorderStyle = BorderStyle.FixedSingle, PlaceholderText = "Search scripts, objects, assets…" };
@@ -43,7 +43,7 @@ public sealed class MainForm : Form
         Dock = DockStyle.Fill,
         TextAlign = ContentAlignment.MiddleCenter,
         ForeColor = Theme.Muted,
-        Font = new Font("Segoe UI", 11f),
+        Font = Theme.Body(Theme.FontSubtitle),
         Text = "GAME PREVIEW\n\nThe game runs in its own resizable window.\nPress F5 to launch · Shift+F5 to stop."
     };
     private readonly ComboBox _outputFilter = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 105 };
@@ -55,6 +55,7 @@ public sealed class MainForm : Form
     private int _lastWorkerLogRepeatCount;
     private DateTime _lastWorkerLogAt;
     private bool _refreshingOutput;
+    private StatusStrip? _statusStrip;
     private readonly ToolStripStatusLabel _status = new() { Spring = true, TextAlign = ContentAlignment.MiddleRight, Text = "Ready" };
     private ToolStripButton? _undoButton;
     private ToolStripButton? _redoButton;
@@ -86,21 +87,39 @@ public sealed class MainForm : Form
     private bool _updatingScriptTabs;
     private bool _refreshingSearch;
     private bool _isDirty;
+    private bool _autoCollapsedInspector;
+    private bool _autoCollapsedExplorer;
+    private bool _autoCollapsedBottom;
+    private ToolStripStatusLabel? _selectionStatus;
+    private Label? _gamePreviewBadge;
+    private ListBox? _gamePlayerLog;
+    private readonly EditorSettings _settings;
+    private ToolStripMenuItem? _recentProjectsMenu;
 
     public MainForm(string? initialProject)
     {
         Text = "PixelEngine 2.0 — Studio";
-        MinimumSize = new Size(1180, 720);
-        Size = new Size(1580, 980);
-        WindowState = FormWindowState.Maximized;
-        StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleDimensions = new SizeF(96f, 96f);
         BackColor = Theme.Window;
         ForeColor = Theme.Text;
-        Font = new Font("Segoe UI", 9f);
+        Font = Theme.Body(Theme.FontBody);
         KeyPreview = true;
+        DoubleBuffered = true;
+        // Minimum and default sizes are expressed in logical DIPs and scaled once the DPI is
+        // known, so the dock layout keeps its proportion on 125%–250% displays instead of
+        // collapsing the viewport. The minimum is the point where every dock still fits.
+        Theme.TrackDpi(this);
+        MinimumSize = new Size(Theme.Px(1000), Theme.Px(620));
+        Size = new Size(Theme.Px(1580), Theme.Px(980));
+        StartPosition = FormStartPosition.CenterScreen;
+        // Preferences are loaded before the shell so toolbars, the terminal and the scene view
+        // start with the user's saved state instead of being patched afterwards.
+        _settings = EditorSettings.Load(out var settingsWarning);
+        ApplySettingsToControls();
 
         BuildShell();
+        if (settingsWarning is not null) Log(settingsWarning);
         WireEvents();
         if (!string.IsNullOrWhiteSpace(initialProject) && File.Exists(initialProject)) OpenProject(initialProject);
         else OpenRecentDefault();
@@ -118,26 +137,63 @@ public sealed class MainForm : Form
         var menu = BuildMenu();
         var workspaceBar = BuildWorkspaceBar();
         var toolbar = BuildToolbar();
-        var status = new StatusStrip { BackColor = Theme.Panel, ForeColor = Theme.Muted, SizingGrip = false, Dock = DockStyle.Fill };
+        var status = new StatusStrip
+        {
+            BackColor = Theme.Panel,
+            ForeColor = Theme.Muted,
+            SizingGrip = false,
+            Dock = DockStyle.Fill,
+            Padding = new Padding(Theme.Px(10), 0, Theme.Px(6), 0),
+            Font = Theme.Body(Theme.FontSmall)
+        };
+        _statusStrip = status;
         status.Renderer = StudioToolStripStyle.CreateRenderer();
-        status.Items.Add(new ToolStripStatusLabel("● PixelEngine Studio") { ForeColor = Theme.Accent });
-        status.Items.Add(new ToolStripStatusLabel { Spring = true });
-        status.Items.Add(new ToolStripStatusLabel("MonoGame · LIC · Lua") { ForeColor = Theme.Muted });
+        status.Items.Add(new ToolStripStatusLabel("● PixelEngine Studio")
+        {
+            ForeColor = Theme.AccentBright,
+            Font = Theme.Strong(Theme.FontSmall),
+            LinkBehavior = LinkBehavior.NeverUnderline
+        });
+        status.Items.Add(new ToolStripStatusLabel { Spring = true, Text = string.Empty });
+        _selectionStatus = new ToolStripStatusLabel("◇ No scene")
+        {
+            ForeColor = Theme.Muted,
+            Font = Theme.Body(Theme.FontSmall),
+            Margin = new Padding(0, 0, Theme.Px(12), 0)
+        };
+        _selectionStatus.Spring = false;
+        _selectionStatus.AutoSize = false;
+        _selectionStatus.Width = Theme.Px(300);
+        status.Items.Add(_selectionStatus);
+        _status.Text = "Ready";
+        _status.ForeColor = Theme.Muted;
+        _status.Font = Theme.Body(Theme.FontSmall);
+        _status.Spring = false;
+        _status.AutoSize = false;
+        _status.Width = Theme.Px(420);
+        _status.TextAlign = ContentAlignment.MiddleRight;
         status.Items.Add(_status);
+        status.Items.Add(new ToolStripStatusLabel("MONOGAME · LIC · LUA")
+        {
+            ForeColor = Theme.Dim,
+            Font = Theme.Body(Theme.FontCaption),
+            Margin = new Padding(Theme.Px(10), 0, 0, 0)
+        });
 
         ConfigureTreeAndPropertyGrid();
         // Configure the nested vertical dock before parenting controls into its panels.
-        ConfigureSplit(_leftDockSplit, Orientation.Horizontal, new Size(285, 555), 330, 210, 155);
+        // All metrics are logical DIPs; ConfigureSplit scales them for the current DPI.
+        ConfigureSplit(_leftDockSplit, Orientation.Horizontal, new Size(285, 555), 300, 210, 155);
         var explorerPanel = CreateExplorerPanel();
         var centerPanel = CreateCenterPanel();
         var inspectorPanel = CreateInspectorPanel();
         var bottomPanel = CreateBottomPanel();
 
-        // Godot-style dock layout: Scene + FileSystem on the left, viewport in the
-        // center, Inspector/Node/Signals on the right and Output/Problems/Terminal below.
+        // Dock layout: Scene + FileSystem on the left, viewport in the center,
+        // Inspector/Node/Signals on the right and Output/Problems/Terminal below.
         ConfigureSplit(_rootSplit, Orientation.Horizontal, new Size(1500, 760), 555, 420, 145);
-        ConfigureSplit(_sideSplit, Orientation.Vertical, new Size(1500, 555), 285, 220, 560);
-        ConfigureSplit(_centerSplit, Orientation.Vertical, new Size(1210, 555), 900, 480, 260);
+        ConfigureSplit(_sideSplit, Orientation.Vertical, new Size(1500, 555), 285, 200, 440);
+        ConfigureSplit(_centerSplit, Orientation.Vertical, new Size(1210, 555), 900, 420, 240);
 
         _sideSplit.Panel1.Controls.Add(explorerPanel);
         _sideSplit.Panel2.Controls.Add(_centerSplit);
@@ -158,20 +214,18 @@ public sealed class MainForm : Form
             Padding = Padding.Empty
         };
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));  // menu
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));  // workspace modes
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));  // main toolbar
-        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));  // docks
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 23f));  // status
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Px(30)));  // menu
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Px(36)));  // workspace modes
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Px(44)));  // main toolbar
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));           // docks
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.Px(24)));  // status
 
         menu.Dock = DockStyle.Fill;
         menu.AutoSize = false;
-        menu.Height = 28;
-        menu.Padding = new Padding(8, 2, 8, 2);
+        menu.Height = Theme.Px(30);
         MainMenuStrip = menu;
         workspaceBar.Dock = DockStyle.Fill;
         toolbar.Dock = DockStyle.Fill;
-        toolbar.Height = 40;
         _rootSplit.Dock = DockStyle.Fill;
 
         shell.Controls.Add(menu, 0, 0);
@@ -183,6 +237,9 @@ public sealed class MainForm : Form
 
         _workerLogFlushTimer.Tick += (_, _) => FlushRepeatedWorkerLog();
         _layoutSaveTimer.Tick += (_, _) => { _layoutSaveTimer.Stop(); SaveDockLayout(); };
+        _workerLogFlushTimer.Interval = 1200;
+        _layoutSaveTimer.Interval = 500;
+        _scriptHistoryTimer.Interval = 650;
         _rootSplit.SplitterMoved += (_, _) => ScheduleDockLayoutSave();
         _sideSplit.SplitterMoved += (_, _) => ScheduleDockLayoutSave();
         _centerSplit.SplitterMoved += (_, _) => ScheduleDockLayoutSave();
@@ -192,15 +249,85 @@ public sealed class MainForm : Form
             ApplyInitialSplitDistances();
             _sceneCanvas.FitScene();
             UpdateWorkspaceModeButtons();
+            StudioControlStyler.Style(this);
+            ApplyResponsiveLayout();
+            UpdateWindowTitle();
+            RefreshRecentProjectsMenu();
         };
+        DpiChanged += (_, e) => OnDpiChanged();
+        Resize += (_, _) => ApplyResponsiveLayout();
+    }
+
+    /// <summary>
+    /// Keeps the editor usable on small or high-DPI displays: when the window is too narrow for
+    /// both side docks the inspector collapses first (View → Toggle Inspector restores it), and
+    /// below the dock threshold the left dock collapses as well. Nothing is clipped: the centre
+    /// viewport always keeps a usable minimum and the user can re-open any dock from the View menu.
+    /// </summary>
+    private void ApplyResponsiveLayout()
+    {
+        if (!IsHandleCreated || IsDisposed || WindowState == FormWindowState.Minimized) return;
+        try
+        {
+            var width = ClientSize.Width;
+            var height = ClientSize.Height;
+            if (width <= 0 || height <= 0) return;
+            var compact = width < Theme.Px(1240);
+            var narrow = width < Theme.Px(1080);
+            if (compact && !_centerSplit.Panel2Collapsed && _autoCollapsedInspector is false)
+            {
+                _autoCollapsedInspector = true;
+                _centerSplit.Panel2Collapsed = true;
+            }
+            else if (!compact && _autoCollapsedInspector)
+            {
+                _autoCollapsedInspector = false;
+                _centerSplit.Panel2Collapsed = false;
+            }
+            if (narrow && !_sideSplit.Panel1Collapsed && !_autoCollapsedExplorer)
+            {
+                _autoCollapsedExplorer = true;
+                _sideSplit.Panel1Collapsed = true;
+            }
+            else if (!narrow && _autoCollapsedExplorer)
+            {
+                _autoCollapsedExplorer = false;
+                _sideSplit.Panel1Collapsed = false;
+            }
+            if (height < Theme.Px(640) && !_rootSplit.Panel2Collapsed && !_autoCollapsedBottom)
+            {
+                _autoCollapsedBottom = true;
+                _rootSplit.Panel2Collapsed = true;
+            }
+            else if (height >= Theme.Px(700) && _autoCollapsedBottom)
+            {
+                _autoCollapsedBottom = false;
+                _rootSplit.Panel2Collapsed = false;
+            }
+            // Status text is the first thing to be clipped when the window narrows, so it is
+            // bounded by the real status strip width and stops growing on very wide monitors.
+            var available = _statusStrip is { IsDisposed: false, Width: > 0 } strip ? strip.Width : width;
+            _status.Width = Math.Max(Theme.Px(120), Math.Min(Theme.Px(420), available * 2 / 5));
+            // Keep the custom dock proportions sane after the collapse decisions above; saved
+            // layouts are preserved, only out-of-range distances are repaired.
+            ClampSplitDistances();
+        }
+        catch (InvalidOperationException) { /* The window is closing while the split containers detach. */ }
+    }
+
+    private void OnDpiChanged()
+    {
+        Theme.TrackDpi(this);
+        StudioControlStyler.Style(this);
+        ApplyDefaultSplitDistances();
+        _sceneCanvas.Invalidate();
+        SetStatus($"Display scale changed · {Theme.DpiScale * 100:0}% DPI");
     }
 
     private Control CreateExplorerPanel()
     {
         _explorerTabs.Dock = DockStyle.Fill;
-        _explorerTabs.Appearance = TabAppearance.FlatButtons;
-        _explorerTabs.SizeMode = TabSizeMode.Fixed;
-        _explorerTabs.ItemSize = new Size(58, 27);
+        _explorerTabs.FixedTabWidth = 58;
         StyleTabs(_explorerTabs, 58);
 
         var sceneTab = new TabPage("Scene") { BackColor = Theme.Panel, Padding = Padding.Empty };
@@ -273,11 +400,11 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = false,
-            Height = 32,
+            Height = Theme.Px(34),
             BackColor = Theme.Toolbar,
             ForeColor = Theme.Text,
             GripStyle = ToolStripGripStyle.Hidden,
-            Padding = new Padding(4, 2, 4, 2),
+            Padding = new Padding(Theme.Px(4), Theme.Px(2), Theme.Px(4), Theme.Px(2)),
             LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow
         };
         toolbar.Renderer = StudioToolStripStyle.CreateRenderer();
@@ -286,7 +413,7 @@ public sealed class MainForm : Form
         {
             ForeColor = Theme.Text,
             ToolTipText = "Add a node to the active scene",
-            Font = new Font("Segoe UI Semibold", 11f),
+            Font = Theme.Strong(Theme.FontSubtitle),
             Padding = new Padding(7, 1, 7, 1)
         };
         foreach (var kind in new[] { "rect", "circle", "text", "poly", "button" })
@@ -302,7 +429,7 @@ public sealed class MainForm : Form
         toolbar.Items.Add(new ToolStripSeparator());
         _sceneTreeSearch.BackColor = Theme.Viewport;
         _sceneTreeSearch.ForeColor = Theme.Text;
-        _sceneTreeSearch.Font = new Font("Segoe UI", 8.5f);
+        _sceneTreeSearch.Font = Theme.Body(Theme.FontSmall);
         _sceneTreeSearch.TextBox.KeyDown += (_, e) =>
         {
             if (e.KeyCode != Keys.Enter) return;
@@ -398,12 +525,12 @@ public sealed class MainForm : Form
     private Control CreateProjectSearchPanel()
     {
         var panel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Padding = new Padding(6) };
-        var heading = new Label { Dock = DockStyle.Top, Height = 25, Text = "SEARCH", ForeColor = Theme.Muted, Font = new Font("Segoe UI Semibold", 8.5f), TextAlign = ContentAlignment.MiddleLeft };
+        var heading = new Label { Dock = DockStyle.Top, Height = 25, Text = "SEARCH", ForeColor = Theme.Muted, Font = Theme.Strong(Theme.FontSmall), TextAlign = ContentAlignment.MiddleLeft };
         _projectSearchBox.Dock = DockStyle.Top;
         _projectSearchBox.Height = 28;
         _projectSearchBox.BackColor = Theme.Viewport;
         _projectSearchBox.ForeColor = Theme.Text;
-        _projectSearchBox.Font = new Font("Segoe UI", 9.5f);
+        _projectSearchBox.Font = Theme.Body(Theme.FontBody);
         _projectSearchResults.Dock = DockStyle.Fill;
         _projectSearchResults.BackColor = Theme.Viewport;
         _projectSearchResults.ForeColor = Theme.Text;
@@ -546,6 +673,34 @@ public sealed class MainForm : Form
         SetSplitDistance(_leftDockSplit, (int)(_leftDockSplit.Height * .53));
     }
 
+    /// <summary>
+    /// Repairs splitter distances that would clip a panel after a resize or a DPI change. The saved
+    /// user layout is only adjusted when it is physically impossible to honour.
+    /// </summary>
+    private void ClampSplitDistances()
+    {
+        ClampSplit(_rootSplit, horizontal: false, minimumPanel1: Theme.Px(220), minimumPanel2: Theme.Px(120));
+        ClampSplit(_sideSplit, horizontal: true, minimumPanel1: Theme.Px(180), minimumPanel2: Theme.Px(260));
+        ClampSplit(_centerSplit, horizontal: true, minimumPanel1: Theme.Px(320), minimumPanel2: Theme.Px(220));
+        ClampSplit(_leftDockSplit, horizontal: false, minimumPanel1: Theme.Px(120), minimumPanel2: Theme.Px(140));
+    }
+
+    private static void ClampSplit(SplitContainer split, bool horizontal, int minimumPanel1, int minimumPanel2)
+    {
+        try
+        {
+            if (split.IsDisposed || split.Panel1Collapsed || split.Panel2Collapsed) return;
+            var extent = horizontal ? split.Width : split.Height;
+            var maximum = extent - minimumPanel2 - split.SplitterWidth;
+            if (maximum <= minimumPanel1) return; // The dock is narrower than both minimums: leave it alone.
+            var current = split.SplitterDistance;
+            if (current < minimumPanel1) split.SplitterDistance = minimumPanel1;
+            else if (current > maximum) split.SplitterDistance = maximum;
+        }
+        catch (ArgumentOutOfRangeException) { /* The container is mid-relayout; the next resize retries. */ }
+        catch (InvalidOperationException) { }
+    }
+
     private static string DockLayoutFile =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "PixelEngine", "EditorLayout.v4.json");
@@ -610,14 +765,18 @@ public sealed class MainForm : Form
     {
         split.Dock = DockStyle.Fill;
         split.Orientation = orientation;
-        split.SplitterWidth = 6;
+        split.SplitterWidth = Theme.Px(6);
         split.BorderStyle = BorderStyle.None;
-        split.Size = initialSize;
-        split.Panel1MinSize = panel1Minimum;
-        split.Panel2MinSize = panel2Minimum;
-        var extent = orientation == Orientation.Vertical ? initialSize.Width : initialSize.Height;
-        split.SplitterDistance = Math.Clamp(distance, panel1Minimum, Math.Max(panel1Minimum, extent - panel2Minimum - split.SplitterWidth));
+        split.Size = new Size(Theme.Px(initialSize.Width), Theme.Px(initialSize.Height));
+        split.Panel1MinSize = Theme.Px(panel1Minimum);
+        split.Panel2MinSize = Theme.Px(panel2Minimum);
+        var extent = orientation == Orientation.Vertical ? split.Size.Width : split.Size.Height;
+        split.SplitterDistance = Math.Clamp(Theme.Px(distance), split.Panel1MinSize,
+            Math.Max(split.Panel1MinSize, extent - split.Panel2MinSize - split.SplitterWidth));
         split.BackColor = Theme.Window;
+        // A splitter must still be draggable with a mouse on 4K displays; 6 DIP is the
+        // narrowest width that keeps a visible hairline and is generous for touch.
+        split.TabStop = false;
     }
 
     private static void SetSplitDistance(SplitContainer split, int desired)
@@ -638,9 +797,9 @@ public sealed class MainForm : Form
         _hierarchy.FullRowSelect = true;
         _hierarchy.ShowLines = true;
         _hierarchy.ShowRootLines = false;
-        _hierarchy.Indent = 18;
-        _hierarchy.ItemHeight = 24;
-        _hierarchy.Font = new Font("Segoe UI", 9.25f);
+        _hierarchy.Indent = Theme.Px(16);
+        _hierarchy.ItemHeight = Theme.Px(23);
+        _hierarchy.Font = Theme.Body(Theme.FontControl);
 
         _inspector.Dock = DockStyle.Fill;
         _inspector.BackColor = Theme.Panel;
@@ -649,7 +808,7 @@ public sealed class MainForm : Form
         _inspector.CategoryForeColor = Theme.Muted;
         _inspector.HelpBackColor = Theme.Panel;
         _inspector.HelpForeColor = Theme.Text;
-        _inspector.LineColor = Color.FromArgb(58, 64, 75);
+        _inspector.LineColor = Theme.Border;
         _inspector.ToolbarVisible = true;
         _inspector.HelpVisible = true;
         _inspector.PropertySort = PropertySort.CategorizedAlphabetical;
@@ -667,7 +826,7 @@ public sealed class MainForm : Form
             BackColor = Theme.Panel,
             ForeColor = Theme.Text,
             RenderMode = ToolStripRenderMode.Professional,
-            Font = new Font("Segoe UI", 9.25f),
+            Font = Theme.Body(Theme.FontBody),
             Padding = new Padding(8, 4, 8, 4),
             GripStyle = ToolStripGripStyle.Hidden
         };
@@ -675,6 +834,8 @@ public sealed class MainForm : Form
         var file = new ToolStripMenuItem("File");
         file.DropDownItems.Add(MenuItem("New Project", Keys.Control | Keys.N, (_, _) => NewProject()));
         file.DropDownItems.Add(MenuItem("Open .lic…", Keys.Control | Keys.O, (_, _) => OpenDialog()));
+        _recentProjectsMenu = new ToolStripMenuItem("Recent Projects");
+        file.DropDownItems.Add(_recentProjectsMenu);
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(MenuItem("Save", Keys.Control | Keys.S, (_, _) => SaveProject()));
         file.DropDownItems.Add(MenuItem("Save As…", Keys.Control | Keys.Shift | Keys.S, (_, _) => SaveProjectAs()));
@@ -739,6 +900,9 @@ public sealed class MainForm : Form
             SaveDockLayout();
         }));
         view.DropDownItems.Add(new ToolStripSeparator());
+        view.DropDownItems.Add(MenuItem("Terminal: PowerShell Session", Keys.None, (_, _) => { OpenBottomTab(2); _terminal.SwitchShell(TerminalShell.PowerShell); }));
+        view.DropDownItems.Add(MenuItem("Terminal: Command Prompt Session", Keys.None, (_, _) => { OpenBottomTab(2); _terminal.SwitchShell(TerminalShell.Cmd); }));
+        view.DropDownItems.Add(new ToolStripSeparator());
         view.DropDownItems.Add(MenuItem("2D Scene View", Keys.Control | Keys.D4, (_, _) => _centerTabs.SelectedIndex = 0));
         view.DropDownItems.Add(MenuItem("Game View", Keys.Control | Keys.D5, (_, _) => _centerTabs.SelectedIndex = 1));
         view.DropDownItems.Add(MenuItem("Script Editor", Keys.Control | Keys.D6, (_, _) => _centerTabs.SelectedIndex = 2));
@@ -756,16 +920,305 @@ public sealed class MainForm : Form
         project.DropDownItems.Add(MenuItem("Build Solution", Keys.None, (_, _) => BuildSolution()));
 
         var tools = new ToolStripMenuItem("Tools");
+        tools.DropDownItems.Add(MenuItem("Preferences…", Keys.Control | Keys.Oemcomma, (_, _) => ShowPreferences()));
+        tools.DropDownItems.Add(new ToolStripSeparator());
         tools.DropDownItems.Add(MenuItem("Diagnostics & Stage 8 Tools…", Keys.Control | Keys.F8, (_, _) => OpenStage8Tools()));
         tools.DropDownItems.Add(MenuItem("Run Project Diagnostics", Keys.None, (_, _) => RunProjectDiagnostics()));
         tools.DropDownItems.Add(MenuItem("Build Editor", Keys.None, (_, _) => RunEditorBuild()));
         tools.DropDownItems.Add(MenuItem("Run Smoke Tests", Keys.None, (_, _) => RunSmokeTests()));
 
         var help = new ToolStripMenuItem("Help");
-        help.DropDownItems.Add(MenuItem("About PixelEngine", Keys.None, (_, _) =>
-            MessageBox.Show(this, "PixelEngine 2.0 Studio\nCustom LIC editor with script tools, component metadata, prefabs, asset browser and undo/redo.", "About", MessageBoxButtons.OK, MessageBoxIcon.Information)));
+        help.DropDownItems.Add(MenuItem("About PixelEngine", Keys.None, (_, _) => ShowAboutDialog()));
+        help.DropDownItems.Add(MenuItem("Open Startup Log", Keys.None, (_, _) => OpenFileInShell(StartupLogPath)));
+        help.DropDownItems.Add(MenuItem("Open Log Folder", Keys.None, (_, _) => OpenFolderInShell(Path.GetDirectoryName(StartupLogPath))));
+        help.DropDownItems.Add(new ToolStripSeparator());
+        help.DropDownItems.Add(MenuItem("Keyboard Shortcuts", Keys.None, (_, _) => ShowShortcuts()));
         menu.Items.AddRange([file, edit, node, scenes, view, window, project, tools, help]);
         return menu;
+    }
+
+    // ── Settings ────────────────────────────────────────────────────────────────
+
+    /// <summary>Pushes saved preferences into controls that already exist.</summary>
+    private void ApplySettingsToControls()
+    {
+        _sceneCanvas.GridSize = _settings.SceneGridSize;
+        _sceneCanvas.SnapToGrid = _settings.SceneSnap;
+        _sceneCanvas.ShowGrid = _settings.SceneShowGrid;
+        _sceneCanvas.ShowColliders = _settings.SceneShowColliders;
+        _sceneCanvas.ShowObjectLabels = _settings.SceneShowLabels;
+        _terminal.ApplyPreferences(_settings.TerminalFontSize, _settings.TerminalScrollback,
+            _settings.DefaultShell == "Command Prompt" ? TerminalShell.Cmd : TerminalShell.PowerShell);
+        _codeEditor.ApplyPreferences(_settings.ScriptFontSize, _settings.ScriptWordWrap, _settings.ScriptShowLineNumbers);
+        _output.IntegralHeight = false;
+    }
+
+    private void ShowPreferences()
+    {
+        var updated = EditorPreferencesDialog.Pick(this, _settings);
+        if (updated is null)
+        {
+            SetStatus("Preferences unchanged");
+            return;
+        }
+        CopySettings(updated, _settings);
+        ApplySettingsToControls();
+        SyncSceneToolbarFromSettings();
+        if (!_settings.TrySave(out var error))
+        {
+            MessageBox.Show(this, $"Preferences could not be written to disk.\n\n{error}", "Preferences",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Log("Preferences could not be saved: " + error);
+        }
+        else Log("Preferences saved.");
+        SetStatus("Preferences saved · terminal shell applies to new sessions");
+    }
+
+    /// <summary>Copies the edited working copy back into the live settings instance.</summary>
+    private static void CopySettings(EditorSettings from, EditorSettings to)
+    {
+        to.AutoCheckScripts = from.AutoCheckScripts;
+        to.SaveBeforeRun = from.SaveBeforeRun;
+        to.ConfirmDiscardChanges = from.ConfirmDiscardChanges;
+        to.GroupRepeatedLogs = from.GroupRepeatedLogs;
+        to.MaxOutputEntries = from.MaxOutputEntries;
+        to.DefaultShell = from.DefaultShell;
+        to.TerminalFontSize = from.TerminalFontSize;
+        to.TerminalScrollback = from.TerminalScrollback;
+        to.ScriptFontSize = from.ScriptFontSize;
+        to.ScriptWordWrap = from.ScriptWordWrap;
+        to.SceneGridSize = from.SceneGridSize;
+        to.SceneSnap = from.SceneSnap;
+        to.SceneShowGrid = from.SceneShowGrid;
+        to.SceneShowColliders = from.SceneShowColliders;
+        to.SceneShowLabels = from.SceneShowLabels;
+        to.Normalize();
+    }
+
+    /// <summary>Reflects scene-view defaults back into the Scene toolbar toggles.</summary>
+    private void SyncSceneToolbarFromSettings()
+    {
+        _sceneCanvas.Invalidate();
+        SetStatus("Scene view defaults applied");
+    }
+
+    private void PersistSettings()
+    {
+        _settings.SceneGridSize = _sceneCanvas.GridSize;
+        _settings.SceneSnap = _sceneCanvas.SnapToGrid;
+        _settings.SceneShowGrid = _sceneCanvas.ShowGrid;
+        _settings.SceneShowColliders = _sceneCanvas.ShowColliders;
+        _settings.SceneShowLabels = _sceneCanvas.ShowObjectLabels;
+        if (_settings.TrySave(out var error)) return;
+        Log("Editor settings could not be saved: " + error);
+    }
+
+    private void RememberProject(string? path)
+    {
+        _settings.RememberProject(path);
+        _settings.TrySave(out _);
+        RefreshRecentProjectsMenu();
+    }
+
+    private void RefreshRecentProjectsMenu()
+    {
+        if (_recentProjectsMenu is null) return;
+        _recentProjectsMenu.DropDownItems.Clear();
+        var recent = _settings.ExistingRecentProjects().Take(10).ToArray();
+        if (recent.Length == 0)
+        {
+            _recentProjectsMenu.DropDownItems.Add(new ToolStripMenuItem("No recent projects") { Enabled = false });
+            return;
+        }
+        foreach (var path in recent)
+        {
+            var item = new ToolStripMenuItem(Path.GetFileName(path))
+            {
+                ToolTipText = path,
+                Tag = path
+            };
+            item.Click += (_, _) =>
+            {
+                if (!ConfirmPendingChanges("open another project")) return;
+                OpenProject((string)item.Tag);
+            };
+            _recentProjectsMenu.DropDownItems.Add(item);
+        }
+        _recentProjectsMenu.DropDownItems.Add(new ToolStripSeparator());
+        _recentProjectsMenu.DropDownItems.Add("Clear list", null, (_, _) =>
+        {
+            _settings.RecentProjects.Clear();
+            _settings.TrySave(out _);
+            RefreshRecentProjectsMenu();
+        });
+    }
+
+    private static string StartupLogPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "PixelEngine", "Logs", "editor-startup.log");
+
+    /// <summary>About dialog with real runtime information instead of a static message box.</summary>
+    private void ShowAboutDialog()
+    {
+        using var dialog = new Form
+        {
+            Text = "About PixelEngine Studio",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(Theme.Px(520), Theme.Px(330)),
+            BackColor = Theme.Window,
+            ForeColor = Theme.Text,
+            Font = Theme.Body(Theme.FontBody)
+        };
+        var title = new Label
+        {
+            Text = "PIXELENGINE STUDIO",
+            Dock = DockStyle.Top,
+            Height = Theme.Px(56),
+            ForeColor = Theme.TextStrong,
+            Font = Theme.Strong(Theme.FontTitle),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(Theme.Px(20), 0, 0, 0)
+        };
+        var subtitle = new Label
+        {
+            Text = "2D engine · LIC project format · MonoGame runtime · Lua scripting",
+            Dock = DockStyle.Top,
+            Height = Theme.Px(26),
+            ForeColor = Theme.Muted,
+            Font = Theme.Body(Theme.FontBody),
+            Padding = new Padding(Theme.Px(20), 0, 0, 0)
+        };
+        var details = new Label
+        {
+            Dock = DockStyle.Fill,
+            ForeColor = Theme.Muted,
+            Font = Theme.Mono(Theme.FontBody),
+            Padding = new Padding(Theme.Px(20), Theme.Px(12), Theme.Px(20), 0),
+            Text = string.Join(Environment.NewLine,
+                $"Version          {typeof(MainForm).Assembly.GetName().Version}",
+                $"Runtime          .NET {Environment.Version}",
+                $"OS               {Environment.OSVersion}",
+                $"Architecture     {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}",
+                $"Display scale    {Theme.DpiScale * 100:0}%",
+                $"Workspace        {FindRepositoryRoot() ?? "(not a source checkout)"}",
+                $"FileSystem dock  {_project?.Assets.Count ?? 0} embedded asset(s)",
+                $"Scene count      {_project?.Scenes.Count ?? 0}")
+        };
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = Theme.Px(52),
+            FlowDirection = FlowDirection.RightToLeft,
+            Padding = new Padding(Theme.Px(16), Theme.Px(10), Theme.Px(16), Theme.Px(6)),
+            WrapContents = false
+        };
+        var close = new StudioButton("Close") { Width = Theme.Px(90), Kind = StudioButtonKind.Primary, DialogResult = DialogResult.OK };
+        var logs = new StudioButton("Open log folder") { Width = Theme.Px(140) };
+        logs.Click += (_, _) => OpenFolderInShell(Path.GetDirectoryName(StartupLogPath));
+        buttons.Controls.AddRange([close, logs]);
+        dialog.Controls.Add(details);
+        dialog.Controls.Add(subtitle);
+        dialog.Controls.Add(title);
+        dialog.Controls.Add(buttons);
+        dialog.AcceptButton = close;
+        dialog.Shown += (_, _) => StudioControlStyler.Style(dialog);
+        dialog.ShowDialog(this);
+    }
+
+    private void ShowShortcuts()
+    {
+        var entries = new (string Keys, string Action)[]
+        {
+            ("Ctrl+N", "New project"),
+            ("Ctrl+O", "Open project"),
+            ("Ctrl+S", "Save project"),
+            ("Ctrl+Shift+S", "Save project as"),
+            ("Ctrl+Z / Ctrl+Y", "Undo / redo"),
+            ("Ctrl+Shift+P", "Command palette"),
+            ("Ctrl+P / Ctrl+Shift+F", "Search project"),
+            ("Ctrl+`", "Focus terminal"),
+            ("Ctrl+Shift+B", "Build solution"),
+            ("Ctrl+Shift+M", "Run diagnostics"),
+            ("Ctrl+B", "Toggle left dock"),
+            ("Ctrl+Shift+E", "Toggle FileSystem dock"),
+            ("Ctrl+1 / Ctrl+2 / Ctrl+3", "Toggle inspector / bottom dock (Ctrl+D2, Ctrl+D3)"),
+            ("Ctrl+D4 / Ctrl+D5 / Ctrl+D6", "Scene / Game / Script workspace"),
+            ("F5 / Shift+F5", "Run / stop preview"),
+            ("Ctrl+F7", "Check Lua scripts"),
+            ("Q / W / E / R", "Select / move / rotate / scale (scene focused)"),
+            ("F", "Focus selected object"),
+            ("F2", "Rename selected object"),
+            ("Delete", "Delete selected object"),
+            ("Middle mouse drag", "Pan scene"),
+            ("Mouse wheel", "Zoom scene"),
+            ("Ctrl+Shift+L", "Reset dock layout")
+        };
+        using var dialog = new Form
+        {
+            Text = "Keyboard Shortcuts",
+            FormBorderStyle = FormBorderStyle.SizableToolWindow,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            ShowInTaskbar = false,
+            MinimumSize = new Size(Theme.Px(460), Theme.Px(420)),
+            ClientSize = new Size(Theme.Px(620), Theme.Px(640)),
+            BackColor = Theme.Window,
+            ForeColor = Theme.Text,
+            Font = Theme.Body(Theme.FontBody)
+        };
+        var list = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            HideSelection = false,
+            Margin = new Padding(0)
+        };
+        list.Columns.Add("Shortcut", Theme.Px(200));
+        list.Columns.Add("Action", Theme.Px(400));
+        foreach (var (keys, action) in entries)
+        {
+            var row = new ListViewItem(keys);
+            row.SubItems.Add(action);
+            list.Items.Add(row);
+        }
+        var header = new StudioSectionHeader { Text = "Editor shortcuts", Height = Theme.Px(30) };
+        dialog.Controls.Add(list);
+        dialog.Controls.Add(header);
+        dialog.Shown += (_, _) => StudioControlStyler.Style(dialog);
+        dialog.ShowDialog(this);
+    }
+
+    /// <summary>Opens a file with the OS default handler; failures are reported in Output instead of crashing.</summary>
+    private void OpenFileInShell(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) { Log("File not found: " + path); return; }
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        {
+            Log("Could not open file: " + ex.Message);
+        }
+    }
+
+    private void OpenFolderInShell(string? folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder)) return;
+        try
+        {
+            Directory.CreateDirectory(folder);
+            Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException or UnauthorizedAccessException)
+        {
+            Log("Could not open folder: " + ex.Message);
+        }
     }
 
     private void OpenStage8Tools()
@@ -785,18 +1238,25 @@ public sealed class MainForm : Form
             _sceneCanvas.Invalidate();
         };
         form.ShowDialog(this);
-        if (changed)
+        if (!changed) return;
+        _isDirty = true;
+        UpdateWindowTitle();
+        var answer = MessageBox.Show(this,
+            "Authoring data changed (animation clips, lights, particle emitters or tile maps).\n\nSave the project now?",
+            "Stage 8 tools", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+        if (answer == DialogResult.Cancel)
         {
-            if (TrySaveProject())
-            {
-                RefreshProjectView();
-                Log("Stage 8 authoring data saved.");
-            }
-            else
-            {
-                Log("Stage 8 authoring changes remain unsaved; use File → Save.");
-            }
+            Log("Authoring changes kept in memory; use File → Save when ready.");
+            RefreshProjectView();
+            return;
         }
+        if (answer == DialogResult.Yes && TrySaveProject())
+        {
+            Log("Authoring data saved to " + (_projectPath ?? "project") + ".");
+            SetStatus("Authoring data saved");
+        }
+        else Log("Authoring data changed but not saved; use File → Save.");
+        RefreshProjectView();
     }
 
     private void RunProjectDiagnostics()
@@ -842,13 +1302,13 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             AutoSize = false,
-            Height = 34,
+            Height = Theme.Px(36),
             BackColor = Theme.Panel,
             ForeColor = Theme.Text,
             GripStyle = ToolStripGripStyle.Hidden,
-            Padding = new Padding(10, 2, 10, 2),
+            Padding = new Padding(Theme.Px(10), Theme.Px(3), Theme.Px(10), Theme.Px(3)),
             LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow,
-            Font = new Font("Segoe UI Semibold", 9f)
+            Font = Theme.Strong(Theme.FontBody)
         };
         bar.Renderer = StudioToolStripStyle.CreateRenderer();
 
@@ -873,7 +1333,7 @@ public sealed class MainForm : Form
         {
             Alignment = ToolStripItemAlignment.Right,
             ForeColor = Theme.Muted,
-            Font = new Font("Segoe UI Semibold", 8f),
+            Font = Theme.Strong(Theme.FontCaption),
             Margin = new Padding(8, 1, 4, 1)
         });
         return bar;
@@ -889,7 +1349,7 @@ public sealed class MainForm : Form
             Enabled = enabled,
             ForeColor = Theme.Text,
             ToolTipText = tooltip,
-            Font = new Font("Segoe UI Semibold", 9f),
+            Font = Theme.Strong(Theme.FontBody),
             Margin = new Padding(3, 1, 3, 1),
             Padding = new Padding(10, 3, 10, 3)
         };
@@ -927,14 +1387,14 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = false,
-            Height = 42,
+            Height = Theme.Px(44),
             BackColor = Theme.Toolbar,
             ForeColor = Theme.Text,
             GripStyle = ToolStripGripStyle.Hidden,
-            Padding = new Padding(10, 4, 10, 4),
+            Padding = new Padding(Theme.Px(10), Theme.Px(4), Theme.Px(10), Theme.Px(4)),
             CanOverflow = true,
             LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow,
-            Font = new Font("Segoe UI", 9.25f)
+            Font = Theme.Body(Theme.FontBody)
         };
         toolbar.Renderer = StudioToolStripStyle.CreateRenderer();
         toolbar.ImageScalingSize = new Size(16, 16);
@@ -969,7 +1429,7 @@ public sealed class MainForm : Form
         _sceneSelector.AutoSize = false;
         _sceneSelector.Width = 190;
         _sceneSelector.Height = 27;
-        _sceneSelector.Font = new Font("Segoe UI", 9f);
+        _sceneSelector.Font = Theme.Body(Theme.FontBody);
         toolbar.Items.Add(_sceneSelector);
         _newSceneButton = StyledToolButton("+ Scene", "Add a scene", (_, _) => AddScene());
         toolbar.Items.Add(_newSceneButton);
@@ -977,7 +1437,7 @@ public sealed class MainForm : Form
         {
             ForeColor = Theme.Text,
             ToolTipText = "Create an object in the active scene",
-            Font = new Font("Segoe UI", 9.25f),
+            Font = Theme.Body(Theme.FontBody),
             Margin = new Padding(3, 1, 3, 1),
             Padding = new Padding(7, 3, 7, 3)
         };
@@ -1005,7 +1465,7 @@ public sealed class MainForm : Form
         toolbar.Items.Add(new ToolStripLabel(text)
         {
             ForeColor = Theme.Muted,
-            Font = new Font("Segoe UI Semibold", 7.5f),
+            Font = Theme.Strong(Theme.FontCaption),
             Margin = new Padding(2, 2, 5, 1),
             Padding = Padding.Empty
         });
@@ -1017,12 +1477,12 @@ public sealed class MainForm : Form
         {
             DisplayStyle = ToolStripItemDisplayStyle.Text,
             ForeColor = Theme.Text,
-            Font = new Font("Segoe UI", 9.25f),
+            Font = Theme.Body(Theme.FontBody),
             ToolTipText = tooltip,
-            Margin = new Padding(2, 1, 2, 1),
-            Padding = new Padding(7, 3, 7, 3),
+            Margin = new Padding(Theme.Px(2), Theme.Px(1), Theme.Px(2), Theme.Px(1)),
+            Padding = new Padding(Theme.Px(7), Theme.Px(3), Theme.Px(7), Theme.Px(3)),
             AutoSize = false,
-            Width = Math.Max(48, TextRenderer.MeasureText(text, new Font("Segoe UI", 9.25f)).Width + 18)
+            Width = Math.Max(Theme.Px(48), TextRenderer.MeasureText(text, Theme.Body(Theme.FontBody)).Width + Theme.Px(20))
         };
         if (action is not null) button.Click += action;
         return button;
@@ -1034,14 +1494,14 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = false,
-            Height = 38,
+            Height = Theme.Px(40),
             BackColor = Theme.Toolbar,
             ForeColor = Theme.Text,
             GripStyle = ToolStripGripStyle.Hidden,
-            Padding = new Padding(8, 3, 8, 3),
+            Padding = new Padding(Theme.Px(8), Theme.Px(3), Theme.Px(8), Theme.Px(3)),
             CanOverflow = true,
             LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow,
-            Font = new Font("Segoe UI", 9f)
+            Font = Theme.Body(Theme.FontBody)
         };
         toolbar.Renderer = StudioToolStripStyle.CreateRenderer();
         AddToolbarGroupLabel(toolbar, "TRANSFORM");
@@ -1061,7 +1521,7 @@ public sealed class MainForm : Form
                     SceneTool.Scale => "Scale objects (R)",
                     _ => tool.ToString()
                 },
-                Font = new Font("Segoe UI", 9f),
+                Font = Theme.Body(Theme.FontBody),
                 Margin = new Padding(2, 1, 2, 1),
                 Padding = new Padding(7, 3, 7, 3)
             };
@@ -1081,18 +1541,20 @@ public sealed class MainForm : Form
             Margin = new Padding(2, 1, 2, 1),
             Padding = new Padding(6, 3, 6, 3)
         };
-        snap.CheckedChanged += (_, _) => _sceneCanvas.SnapToGrid = snap.Checked;
+        snap.Checked = _sceneCanvas.SnapToGrid;
+        snap.CheckedChanged += (_, _) => { _sceneCanvas.SnapToGrid = snap.Checked; SetStatus(snap.Checked ? "Snapping on" : "Snapping off"); };
         toolbar.Items.Add(snap);
         var gridSize = new ToolStripComboBox
         {
             AutoSize = false,
-            Width = 66,
+            Width = Theme.Px(70),
             DropDownStyle = ComboBoxStyle.DropDownList,
             ToolTipText = "Grid snap size",
-            Margin = new Padding(2, 1, 5, 1)
+            Margin = new Padding(Theme.Px(2), Theme.Px(1), Theme.Px(5), Theme.Px(1))
         };
         gridSize.Items.AddRange(["4", "8", "16", "32", "64"]);
-        gridSize.SelectedItem = "16";
+        var savedGrid = _sceneCanvas.GridSize.ToString("0");
+        gridSize.SelectedItem = gridSize.Items.Contains(savedGrid) ? savedGrid : "16";
         gridSize.SelectedIndexChanged += (_, _) =>
         {
             if (float.TryParse(gridSize.SelectedItem?.ToString(), out var size))
@@ -1105,13 +1567,13 @@ public sealed class MainForm : Form
 
         toolbar.Items.Add(new ToolStripSeparator { Margin = new Padding(6, 3, 6, 3) });
         AddToolbarGroupLabel(toolbar, "OVERLAYS");
-        var showGrid = new ToolStripButton("Grid") { ForeColor = Theme.Text, CheckOnClick = true, Checked = true, ToolTipText = "Show scene grid", Padding = new Padding(6, 3, 6, 3) };
+        var showGrid = new ToolStripButton("Grid") { ForeColor = Theme.Text, CheckOnClick = true, Checked = _sceneCanvas.ShowGrid, ToolTipText = "Show scene grid", Padding = new Padding(Theme.Px(6), Theme.Px(3), Theme.Px(6), Theme.Px(3)) };
         showGrid.CheckedChanged += (_, _) => { _sceneCanvas.ShowGrid = showGrid.Checked; _sceneCanvas.Invalidate(); };
         toolbar.Items.Add(showGrid);
-        var labels = new ToolStripButton("Labels") { ForeColor = Theme.Text, CheckOnClick = true, Checked = false, ToolTipText = "Show object labels", Padding = new Padding(6, 3, 6, 3) };
+        var labels = new ToolStripButton("Labels") { ForeColor = Theme.Text, CheckOnClick = true, Checked = _sceneCanvas.ShowObjectLabels, ToolTipText = "Show object labels", Padding = new Padding(Theme.Px(6), Theme.Px(3), Theme.Px(6), Theme.Px(3)) };
         labels.CheckedChanged += (_, _) => { _sceneCanvas.ShowObjectLabels = labels.Checked; _sceneCanvas.Invalidate(); };
         toolbar.Items.Add(labels);
-        var colliders = new ToolStripButton("Colliders") { ForeColor = Theme.Text, CheckOnClick = true, Checked = true, ToolTipText = "Show collider shapes", Padding = new Padding(6, 3, 6, 3) };
+        var colliders = new ToolStripButton("Colliders") { ForeColor = Theme.Text, CheckOnClick = true, Checked = _sceneCanvas.ShowColliders, ToolTipText = "Show collider shapes", Padding = new Padding(Theme.Px(6), Theme.Px(3), Theme.Px(6), Theme.Px(3)) };
         colliders.CheckedChanged += (_, _) => { _sceneCanvas.ShowColliders = colliders.Checked; _sceneCanvas.Invalidate(); };
         toolbar.Items.Add(colliders);
         toolbar.Items.Add(new ToolStripSeparator { Margin = new Padding(6, 3, 6, 3) });
@@ -1132,8 +1594,7 @@ public sealed class MainForm : Form
     private Control CreateCenterPanel()
     {
         _centerTabs.Dock = DockStyle.Fill;
-        _centerTabs.Appearance = TabAppearance.FlatButtons;
-        _centerTabs.SizeMode = TabSizeMode.Fixed;
+        _centerTabs.FixedTabWidth = 154;
         StyleTabs(_centerTabs, 154);
         var sceneTab = new TabPage("Scene") { BackColor = Theme.Viewport, ForeColor = Theme.Text };
         _sceneDocumentTab = sceneTab;
@@ -1145,29 +1606,13 @@ public sealed class MainForm : Form
         sceneTab.Controls.Add(sceneWorkspace);
         var gameTab = new TabPage("Game") { BackColor = Theme.Viewport, ForeColor = Theme.Text };
         _gameHost.Dock = DockStyle.Fill;
-        var previewInfo = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Viewport, Padding = new Padding(28) };
-        var previewCard = new Panel { Width = 520, Height = 250, BackColor = Theme.Panel, Padding = new Padding(22), Anchor = AnchorStyles.None };
-        var previewTitle = new Label { Dock = DockStyle.Top, Height = 38, Text = "GAME PREVIEW", ForeColor = Theme.Text, Font = new Font("Segoe UI Semibold", 15f), TextAlign = ContentAlignment.MiddleCenter };
-        _gamePlaceholder.Dock = DockStyle.Fill;
-        _gamePlaceholder.Text = "The game opens in a separate Windows window.\n\nF5  Run project\nShift+F5  Stop project\n\nUse this tab for preview status; the Scene workspace stays available in the editor.";
-        var previewButtons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 42, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoSize = false, Anchor = AnchorStyles.None };
-        _gameRunButton = SmallToolButton("▶ Run game", "Launch game in its own window");
-        _gameStopButton = SmallToolButton("■ Stop game", "Stop the running game");
-        _gameRunButton.Click += (_, _) => RunPreview();
-        _gameStopButton.Click += (_, _) => StopPreview();
-        previewButtons.Controls.AddRange([_gameRunButton, _gameStopButton]);
-        previewCard.Controls.Add(_gamePlaceholder);
-        previewCard.Controls.Add(previewButtons);
-        previewCard.Controls.Add(previewTitle);
-        previewInfo.Controls.Add(previewCard);
-        previewInfo.Resize += (_, _) => previewCard.Location = new Point(Math.Max(0, (previewInfo.ClientSize.Width - previewCard.Width) / 2), Math.Max(0, (previewInfo.ClientSize.Height - previewCard.Height) / 2));
-        _gameHost.Controls.Add(previewInfo);
+        _gameHost.Controls.Add(BuildGamePreviewPane());
         gameTab.Controls.Add(_gameHost);
         var scriptTab = new TabPage("Script") { BackColor = Theme.Viewport, ForeColor = Theme.Text };
         var scriptWorkspace = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Viewport };
         _scriptTabs.Dock = DockStyle.Top;
-        _scriptTabs.Height = 28;
-        _scriptTabs.Appearance = TabAppearance.FlatButtons;
+        _scriptTabs.Height = Theme.Px(30);
+        _scriptTabs.FixedTabWidth = 142;
         StyleTabs(_scriptTabs, 142);
         _scriptTabs.SelectedIndexChanged += (_, _) =>
         {
@@ -1198,6 +1643,88 @@ public sealed class MainForm : Form
         _centerTabs.SelectedIndexChanged += (_, _) => UpdateWorkspaceModeButtons();
         _centerTabs.Dock = DockStyle.Fill;
         return _centerTabs;
+    }
+
+    /// <summary>
+    /// Game preview tab. The player still runs in its own Windows window — this pane reports
+    /// real process state, shows the launching command and provides an in-editor log of the
+    /// player's stdout/stderr. The layout uses a docked card with AutoScroll so it never clips
+    /// on small windows or high DPI.
+    /// </summary>
+    private Control BuildGamePreviewPane()
+    {
+        var host = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Viewport, AutoScroll = true };
+        var card = new StudioCard
+        {
+            Dock = DockStyle.Top,
+            Height = Theme.Px(268),
+            Margin = new Padding(Theme.Px(18)),
+            CardFill = Theme.Panel,
+            CardBorder = Theme.Border,
+            Padding = new Padding(Theme.Px(20), Theme.Px(16), Theme.Px(20), Theme.Px(12))
+        };
+        var title = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = Theme.Px(34),
+            Text = "GAME PLAYER",
+            ForeColor = Theme.TextStrong,
+            Font = Theme.Strong(Theme.FontTitle),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var badge = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = Theme.Px(24),
+            Text = "● IDLE — the player runs in its own resizable window",
+            ForeColor = Theme.Muted,
+            Font = Theme.Body(Theme.FontBody),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        _gamePlaceholder.Dock = DockStyle.Fill;
+        _gamePlaceholder.Font = Theme.Body(Theme.FontBody);
+        _gamePlaceholder.TextAlign = ContentAlignment.TopLeft;
+        _gamePlaceholder.Padding = new Padding(0, Theme.Px(8), 0, 0);
+        _gamePlaceholder.Text = "F5   Run project in a separate window\nShift+F5   Stop project\n\nThe Scene workspace stays usable while the game runs.";
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = Theme.Px(44),
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Theme.Panel
+        };
+        _gameRunButton = SmallToolButton("▶ Run game", "Launch the game in its own window (F5)");
+        _gameStopButton = SmallToolButton("■ Stop game", "Stop the running game (Shift+F5)");
+        _gameRunButton.Click += (_, _) => RunPreview();
+        _gameStopButton.Click += (_, _) => StopPreview();
+        buttons.Controls.AddRange([_gameRunButton, _gameStopButton]);
+        card.Controls.Add(_gamePlaceholder);
+        card.Controls.Add(buttons);
+        card.Controls.Add(badge);
+        card.Controls.Add(title);
+        _gamePreviewBadge = badge;
+
+        var playerLogHeader = new StudioSectionHeader { Text = "Player output", Height = Theme.Px(28), Dock = DockStyle.Top };
+        var playerLog = new ListBox
+        {
+            Dock = DockStyle.Fill,
+            Name = "_gamePlayerLog",
+            BackColor = Theme.Terminal,
+            ForeColor = Theme.Text,
+            BorderStyle = BorderStyle.None,
+            IntegralHeight = false,
+            Font = Theme.Mono(Theme.FontSmall),
+            HorizontalScrollbar = false
+        };
+        _gamePlayerLog = playerLog;
+        var logHost = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Terminal, Padding = new Padding(0) };
+        logHost.Controls.Add(playerLog);
+        logHost.Controls.Add(playerLogHeader);
+
+        host.Controls.Add(logHost);
+        host.Controls.Add(card);
+        return host;
     }
 
     private ContextMenuStrip BuildSceneContextMenu()
@@ -1281,8 +1808,7 @@ public sealed class MainForm : Form
     private Control CreateInspectorPanel()
     {
         _inspectorTabs.Dock = DockStyle.Fill;
-        _inspectorTabs.Appearance = TabAppearance.FlatButtons;
-        _inspectorTabs.SizeMode = TabSizeMode.Fixed;
+        _inspectorTabs.FixedTabWidth = 82;
         StyleTabs(_inspectorTabs, 82);
 
         var inspectorTab = new TabPage("Inspector") { BackColor = Theme.Panel, Padding = Padding.Empty };
@@ -1309,7 +1835,7 @@ public sealed class MainForm : Form
             Height = 30,
             Text = "AVAILABLE RUNTIME CALLBACKS",
             ForeColor = Theme.Muted,
-            Font = new Font("Segoe UI Semibold", 8f),
+            Font = Theme.Strong(Theme.FontCaption),
             TextAlign = ContentAlignment.MiddleLeft
         };
         _signalsList.Dock = DockStyle.Fill;
@@ -1335,7 +1861,7 @@ public sealed class MainForm : Form
             Height = 54,
             Text = "These callbacks are exposed to C# Component subclasses. Visual signal connections and Lua event binding are not yet supported.",
             ForeColor = Theme.Muted,
-            Font = new Font("Segoe UI", 8f),
+            Font = Theme.Body(Theme.FontSmall),
             TextAlign = ContentAlignment.MiddleLeft
         };
         panel.Controls.Add(_signalsList);
@@ -1347,7 +1873,7 @@ public sealed class MainForm : Form
     private Control CreateBottomPanel()
     {
         _bottomTabs.Dock = DockStyle.Fill;
-        _bottomTabs.Appearance = TabAppearance.FlatButtons;
+        _bottomTabs.FixedTabWidth = 98;
         StyleTabs(_bottomTabs, 98);
         var consoleTab = new TabPage("Output") { BackColor = Theme.Panel, Name = "Output" };
         var problemsTab = new TabPage("Problems") { BackColor = Theme.Panel, Name = "Problems" };
@@ -1403,8 +1929,20 @@ public sealed class MainForm : Form
             SetStatus("Running: " + command);
             if (command.Contains("dotnet build", StringComparison.OrdinalIgnoreCase)) ClearBuildProblems();
         };
-        _terminal.OutputLineReceived += (line, _) => CaptureBuildProblem(line);
-        _terminal.CommandCompleted += (_, exitCode) => SetStatus(exitCode == 0 ? "Terminal command completed" : $"Terminal command failed ({exitCode})");
+        _terminal.OutputLineReceived += (line, isError) => CaptureBuildProblem(line, isError);
+        _terminal.CommandCompleted += (command, exitCode) =>
+        {
+            SetStatus(exitCode == 0 ? $"✓ {Truncate(command, 48)} finished (exit 0)" : $"✗ {Truncate(command, 48)} failed (exit {exitCode})");
+            // Surface a build summary in Problems so a clean build is visibly clean.
+            if (command.Contains("dotnet build", StringComparison.OrdinalIgnoreCase) && _problemList.Items.Count == 0)
+            {
+                var clean = new ListViewItem("OK") { ForeColor = Theme.Success };
+                clean.SubItems.Add("—");
+                clean.SubItems.Add("Build");
+                clean.SubItems.Add(exitCode == 0 ? "Build finished with no errors or warnings." : $"Build failed with exit code {exitCode}.");
+                _problemList.Items.Add(clean);
+            }
+        };
         terminalTab.Controls.Add(_terminal);
 
         _bottomTabs.TabPages.AddRange([consoleTab, problemsTab, terminalTab]);
@@ -1418,15 +1956,25 @@ public sealed class MainForm : Form
             if (_problemList.Items[i].Tag is BuildProblem) _problemList.Items.RemoveAt(i);
     }
 
-    private void CaptureBuildProblem(string line)
+    private static string Truncate(string text, int length)
+        => string.IsNullOrEmpty(text) ? string.Empty : text.Length <= length ? text : text[..(length - 1)] + "…";
+
+    /// <summary>
+    /// Parses MSBuild/Roslyn diagnostics from terminal output into the Problems list. Both the
+    /// classic <c>file(line,col): error CSnnnn: text</c> and the modern
+    /// <c>/path/file.cs:line:col: error CSnnnn: text</c> shapes are supported, as are MSBuild
+    /// summary lines such as <c>Build FAILED.</c>.
+    /// </summary>
+    private void CaptureBuildProblem(string line, bool isErrorOutput = false)
     {
         var normalizedLine = line.Trim();
-        var match = Regex.Match(normalizedLine,
-            @"^(?<file>.+)\((?<line>\d+),(?<column>\d+)\):\s*(?<severity>error|warning)\s+(?<code>[A-Z]+\d+):\s*(?<message>.*?)(?:\s+\[.*\])?$",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        if (!match.Success) return;
+        if (normalizedLine.Length == 0) return;
+        if (!BuildDiagnosticLineParser.TryParse(line, out var file, out var lineNumber, out var column, out var severity, out var code, out var message))
+        {
+            RecordUnparsedStderr(normalizedLine, isErrorOutput);
+            return;
+        }
 
-        var file = match.Groups["file"].Value.Trim();
         try
         {
             if (!Path.IsPathRooted(file) && FindRepositoryRoot() is { } root)
@@ -1437,19 +1985,47 @@ public sealed class MainForm : Form
             Log("Could not normalize compiler source path: " + ex.Message);
             return;
         }
-        var lineNumber = int.TryParse(match.Groups["line"].Value, out var parsedLine) ? parsedLine : 1;
-        var column = int.TryParse(match.Groups["column"].Value, out var parsedColumn) ? parsedColumn : 1;
-        var severity = match.Groups["severity"].Value;
+
         var isError = severity.Equals("error", StringComparison.OrdinalIgnoreCase);
-        var message = match.Groups["message"].Value.Trim();
-        var code = match.Groups["code"].Value;
-        var row = new ListViewItem(severity) { Tag = new BuildProblem(file, lineNumber, column, severity, code, message) };
+        // MSBuild repeats the same diagnostic once per referencing project; keep the list unique.
+        foreach (ListViewItem existing in _problemList.Items)
+        {
+            if (existing.Tag is not BuildProblem prior) continue;
+            if (prior.Line == lineNumber && prior.Column == column &&
+                string.Equals(prior.Code, code, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(prior.FilePath, file, StringComparison.OrdinalIgnoreCase))
+            {
+                prior.Occurrences++;
+                existing.SubItems[3].Text = prior.Occurrences > 1 ? $"{prior.Message}  (×{prior.Occurrences})" : prior.Message;
+                return;
+            }
+        }
+
+        var problem = new BuildProblem(file, lineNumber, column, severity, code, message);
+        var row = new ListViewItem(severity) { Tag = problem };
         row.SubItems.Add(code);
         row.SubItems.Add($"{Path.GetFileName(file)}:{lineNumber}:{column}");
         row.SubItems.Add(message);
         row.ForeColor = isError ? Theme.Danger : Theme.Warning;
         _problemList.Items.Add(row);
-        SetStatus($"Build {severity}: {code} · {Path.GetFileName(file)}:{lineNumber}");
+        SetStatus($"{(isError ? "Build error" : "Build warning")}: {code} · {Path.GetFileName(file)}:{lineNumber}");
+        // Jump to Problems only for genuine errors so a warning-heavy build stays unobtrusive.
+        if (isError && !_rootSplit.Panel2Collapsed && _bottomTabs.SelectedIndex != 1) _bottomTabs.SelectedIndex = 1;
+    }
+
+    /// <summary>Keeps unparsable stderr visible so a failed command is never silently ignored.</summary>
+    private void RecordUnparsedStderr(string normalizedLine, bool isErrorOutput)
+    {
+        if (!isErrorOutput || normalizedLine.Length >= 400) return;
+        if (normalizedLine.StartsWith('>') || normalizedLine.StartsWith("dotnet", StringComparison.OrdinalIgnoreCase)) return;
+        if (normalizedLine.Contains("exit code", StringComparison.OrdinalIgnoreCase)) return;
+        foreach (ListViewItem existing in _problemList.Items)
+            if (string.Equals(existing.SubItems[3].Text, normalizedLine, StringComparison.Ordinal)) return;
+        var row = new ListViewItem("stderr") { ForeColor = Theme.Danger };
+        row.SubItems.Add("—");
+        row.SubItems.Add("Terminal");
+        row.SubItems.Add(normalizedLine);
+        _problemList.Items.Add(row);
     }
 
     private void NavigateToSelectedProblem()
@@ -1487,12 +2063,23 @@ public sealed class MainForm : Form
             OpenExplorerTab(1);
     }
 
-    private static Button SmallToolButton(string text, string tooltip) => new()
+    private static Button SmallToolButton(string text, string tooltip)
     {
-        Text = text, AutoSize = true, Height = 24, FlatStyle = FlatStyle.Flat,
-        BackColor = Theme.Panel, ForeColor = Theme.Text, Padding = new Padding(7, 0, 7, 0),
-        Margin = new Padding(2), AccessibleDescription = tooltip
-    };
+        var button = new StudioButton(text)
+        {
+            AutoSize = true,
+            Height = Theme.Px(26),
+            Padding = new Padding(Theme.Px(8), 0, Theme.Px(8), 0),
+            Margin = new Padding(Theme.Px(2)),
+            AccessibleDescription = tooltip,
+            AccessibleName = text,
+            Kind = StudioButtonKind.Secondary
+        };
+        var tip = new ToolTip { InitialDelay = 450, ReshowDelay = 200 };
+        tip.SetToolTip(button, tooltip);
+        button.Disposed += (_, _) => tip.Dispose();
+        return button;
+    }
 
     private void RefreshOutputList()
     {
@@ -1541,35 +2128,17 @@ public sealed class MainForm : Form
         }
     }
 
+    /// <summary>Configures a dock tab strip with DPI-scaled tab metrics.</summary>
     private static void StyleTabs(TabControl tabs, int width)
     {
         tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
         tabs.SizeMode = TabSizeMode.Fixed;
-        tabs.ItemSize = new Size(Math.Max(52, width), 28);
-        tabs.Font = new Font("Segoe UI", 8.5f);
+        tabs.Appearance = TabAppearance.Normal;
+        tabs.ItemSize = new Size(Theme.Px(Math.Max(52, width)), Theme.Px(28));
+        tabs.Font = Theme.Body(Theme.FontSmall);
         tabs.HotTrack = true;
-        tabs.DrawItem += (_, e) =>
-        {
-            if (e.Index < 0 || e.Index >= tabs.TabPages.Count) return;
-            var selected = e.Index == tabs.SelectedIndex;
-            var bounds = e.Bounds;
-            using var background = new SolidBrush(selected ? Theme.TabActive : Theme.Panel);
-            e.Graphics.FillRectangle(background, bounds);
-            var text = tabs.TabPages[e.Index].Text;
-            var textColor = selected ? Theme.Text : Theme.Muted;
-            TextRenderer.DrawText(e.Graphics, text, tabs.Font, Rectangle.Inflate(bounds, -7, -1), textColor,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            if (selected)
-            {
-                using var accent = new SolidBrush(Theme.Accent);
-                e.Graphics.FillRectangle(accent, bounds.Left + 2, bounds.Bottom - 2, bounds.Width - 4, 2);
-            }
-            else
-            {
-                using var border = new Pen(Theme.Border);
-                e.Graphics.DrawLine(border, bounds.Left, bounds.Bottom - 1, bounds.Right, bounds.Bottom - 1);
-            }
-        };
+        tabs.Padding = new Point(0, 0);
+        if (tabs is StudioTabControl studioTabs) studioTabs.FixedTabWidth = Math.Max(52, width);
     }
 
     private Control WrapPanel(string title, Control content)
@@ -1581,7 +2150,7 @@ public sealed class MainForm : Form
             Height = 29,
             Text = title,
             ForeColor = Theme.Muted,
-            Font = new Font("Segoe UI Semibold", 8.25f),
+            Font = Theme.Strong(Theme.FontSmall),
             TextAlign = ContentAlignment.MiddleLeft,
             BackColor = Theme.Panel,
             Padding = new Padding(2, 0, 0, 0)
@@ -1688,10 +2257,18 @@ public sealed class MainForm : Form
 
     private void OpenRecentDefault()
     {
+        // Prefer the most recent project that still exists, then fall back to the demo project.
+        var recent = _settings.ExistingRecentProjects().FirstOrDefault();
+        if (recent is not null)
+        {
+            OpenProject(recent);
+            Log("Reopened most recent project: " + recent);
+            return;
+        }
         var root = FindRepositoryRoot();
         var candidate = root is null ? null : Path.Combine(root, "Lic", "demo.lic");
         if (candidate is not null && File.Exists(candidate)) OpenProject(candidate);
-        else Log("Open a project using File → Open .lic.");
+        else Log("Open a project using File → Open .lic (Ctrl+O).");
     }
 
     private void NewProject()
@@ -1719,9 +2296,15 @@ public sealed class MainForm : Form
 
     private void OpenDialog()
     {
-        using var dialog = new OpenFileDialog { Filter = "PixelEngine projects (*.lic)|*.lic|JSON files (*.json)|*.json|All files (*.*)|*.*", Title = "Open PixelEngine project" };
-        if (dialog.ShowDialog(this) == DialogResult.OK && ConfirmPendingChanges("open another project"))
-            OpenProject(dialog.FileName);
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "PixelEngine projects (*.lic)|*.lic|JSON files (*.json)|*.json|All files (*.*)|*.*",
+            Title = "Open PixelEngine project"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        // Ask about unsaved work *before* replacing the project so Cancel really cancels.
+        if (!ConfirmPendingChanges("open another project")) return;
+        OpenProject(dialog.FileName);
     }
 
     private void OpenProject(string path)
@@ -1737,11 +2320,14 @@ public sealed class MainForm : Form
             RefreshProjectView(resetActiveScene: true);
             var objectCount = _project.Scenes.Sum(x => x.Objects.Count);
             Log($"Loaded {_project.Name}: {_project.Scenes.Count} scene(s), {objectCount} object(s), {_project.Scripts.Count} script(s), {_project.Assets.Count} asset(s), {_project.Prefabs.Count} prefab(s).");
-            foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "lua", StringComparison.OrdinalIgnoreCase)))
-            {
-                var error = LicLuaBehaviour.ValidateCode(script.Code);
-                if (!string.IsNullOrEmpty(error)) Log($"Lua syntax error in {script.Name}: {error}");
-            }
+            RememberProject(_projectPath);
+            if (_settings.AutoCheckScripts) CheckScripts(silentWhenClean: true);
+            else
+                foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "lua", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var error = LicLuaBehaviour.ValidateCode(script.Code);
+                    if (!string.IsNullOrEmpty(error)) Log($"Lua syntax error in {script.Name}: {error}");
+                }
         }
         catch (Exception ex)
         {
@@ -1810,6 +2396,7 @@ public sealed class MainForm : Form
     private bool ConfirmPendingChanges(string action)
     {
         if (!_isDirty || _project is null) return true;
+        if (!_settings.ConfirmDiscardChanges) return TrySaveProject();
         var result = MessageBox.Show(this,
             $"Save changes to '{_project.Name}' before you {action}?",
             "Unsaved changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
@@ -1902,6 +2489,7 @@ public sealed class MainForm : Form
         _prefabBrowser.RefreshActionState();
         RefreshProjectSearchResults();
         SetStatus(_projectPath ?? "Unsaved project");
+        UpdateSelectionStatus();
         _sceneCanvas.Invalidate();
         if (resetActiveScene && _sceneCanvas.IsHandleCreated)
             _sceneCanvas.BeginInvoke(new Action(_sceneCanvas.FitScene));
@@ -1937,6 +2525,7 @@ public sealed class MainForm : Form
         else if (node.Tag is LicObjectData or LicSceneData) _centerTabs.SelectedIndex = 0;
         _sceneCanvas.Invalidate();
         _prefabBrowser.RefreshActionState();
+        UpdateSelectionStatus();
     }
 
     private void SelectObjectFromScene(LicObjectData? item)
@@ -2550,7 +3139,7 @@ public sealed class MainForm : Form
         return null;
     }
 
-    private void CheckScripts()
+    private void CheckScripts(bool silentWhenClean = false)
     {
         if (_project is null) return;
         var luaScripts = _project.Scripts.Where(x => string.Equals(x.Language, "lua", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -2567,15 +3156,36 @@ public sealed class MainForm : Form
             }
             if (ReferenceEquals(script, _selectedScript) && string.IsNullOrEmpty(error)) _codeEditor.SetDiagnostic(null);
         }
-        foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "csharp", StringComparison.OrdinalIgnoreCase)))
-            Log($"C# source retained but not executed: {script.Name}");
-        Log($"Lua check complete: {luaScripts.Length - errors}/{luaScripts.Length} passed.");
+        if (!silentWhenClean || errors > 0)
+        {
+            foreach (var script in _project.Scripts.Where(x => string.Equals(x.Language, "csharp", StringComparison.OrdinalIgnoreCase)))
+                Log($"C# source retained but not executed: {script.Name}");
+            Log($"Lua check complete: {luaScripts.Length - errors}/{luaScripts.Length} passed.");
+        }
+        SetStatus(errors == 0
+            ? $"Lua check: {luaScripts.Length} script(s) OK"
+            : $"Lua check: {errors} error(s) in {luaScripts.Length} script(s)");
+        if (errors > 0) OpenBottomTab(0);
     }
 
     private void RunPreview()
     {
-        if (_project is null) return;
-        if (!TrySaveProject())
+        if (_project is null)
+        {
+            SetStatus("Open or create a project before running the player.");
+            return;
+        }
+        if (!_settings.SaveBeforeRun)
+        {
+            if (string.IsNullOrWhiteSpace(_projectPath) || !File.Exists(_projectPath))
+            {
+                MessageBox.Show(this,
+                    "The player runs from a saved .lic file. Save the project (Ctrl+S) before launching, or enable \"Save before launching\" in Tools → Preferences.",
+                    "Project not saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+        }
+        else if (!TrySaveProject())
         {
             SetStatus("Preview cancelled because the project was not saved.");
             return;
@@ -2639,12 +3249,26 @@ public sealed class MainForm : Form
                     catch (InvalidOperationException) { /* The editor may be closing. */ }
                 }
             };
-            _previewProcess.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogFromWorker("[Player] " + e.Data); };
-            _previewProcess.ErrorDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogFromWorker("[Player:Error] " + e.Data); };
+            _previewProcess.OutputDataReceived += (_, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(e.Data)) return;
+                var line = e.Data;
+                LogFromWorker("[Player] " + line);
+                AppendPlayerLog(line, isError: false);
+            };
+            _previewProcess.ErrorDataReceived += (_, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(e.Data)) return;
+                var line = e.Data;
+                LogFromWorker("[Player:Error] " + line);
+                AppendPlayerLog(line, isError: true);
+            };
             _previewProcess.BeginOutputReadLine();
             _previewProcess.BeginErrorReadLine();
-            _gamePlaceholder.Text = "The game is running in a separate Windows window.\n\nF5  Restart game\nShift+F5  Stop game\n\nYou can keep editing the scene while the game window is open.";
-            Log("Launched separate MonoGame game window: " + Path.GetFileName(_projectPath));
+            _gamePlaceholder.Text = "The game is running in its own resizable window.\n\nF5   Restart player\nShift+F5   Stop player\n\nYou can keep editing while the player window is open.";
+            SetPlayerState("● RUNNING — player window is open", Theme.Success);
+            AppendPlayerLog($"launch: dotnet {string.Join(' ', start.ArgumentList)}", isError: false);
+            Log("Launched MonoGame player window: " + Path.GetFileName(_projectPath));
             SetStatus("Game running in separate window");
             UpdateProjectActionButtons();
             // Keep the editor on its current workspace; do not switch to a fake embedded Game tab.
@@ -2673,12 +3297,43 @@ public sealed class MainForm : Form
         {
             _previewProcess?.Dispose();
             _previewProcess = null;
-            _gamePlaceholder.Text = "The game opens in a separate Windows window.\n\nF5  Run project\nShift+F5  Stop project\n\nUse this tab for preview status; the Scene workspace stays available in the editor.";
+            _gamePlaceholder.Text = "F5   Run project in a separate window\nShift+F5   Stop project\n\nThe Scene workspace stays usable while the game runs.";
+            SetPlayerState("● IDLE — the player runs in its own resizable window", Theme.Muted);
             if (!IsDisposed)
             {
                 SetStatus("Preview stopped");
                 UpdateProjectActionButtons();
             }
+        }
+    }
+
+    private void SetPlayerState(string text, Color color)
+    {
+        if (_gamePreviewBadge is null) return;
+        _gamePreviewBadge.Text = text;
+        _gamePreviewBadge.ForeColor = color;
+    }
+
+    /// <summary>Appends a player line to the preview log, bounded so a noisy game cannot grow it forever.</summary>
+    private void AppendPlayerLog(string line, bool isError)
+    {
+        var log = _gamePlayerLog;
+        if (log is null || log.IsDisposed) return;
+        if (log.InvokeRequired)
+        {
+            try { log.BeginInvoke(new Action(() => AppendPlayerLog(line, isError))); }
+            catch (InvalidOperationException) { /* The editor is closing. */ }
+            return;
+        }
+        log.Items.Add($"[{DateTime.Now:HH:mm:ss}] {(isError ? "err " : string.Empty)}{Truncate(line, 500)}");
+        while (log.Items.Count > 500) log.Items.RemoveAt(0);
+        log.TopIndex = Math.Max(0, log.Items.Count - 1);
+        (log.Tag as ToolTip)?.SetToolTip(log, line);
+        if (log.Tag is null)
+        {
+            var tip = new ToolTip { AutoPopDelay = 12000, InitialDelay = 500 };
+            log.Tag = tip;
+            log.Disposed += (_, _) => tip.Dispose();
         }
     }
 
@@ -2693,7 +3348,7 @@ public sealed class MainForm : Form
         }
         _terminal.WorkingDirectoryProvider = () => root!;
         OpenBottomTab(2);
-        _terminal.Execute(@"dotnet build .\PixelEngine.sln -c Debug");
+        _terminal.Execute("dotnet build .\\PixelEngine.sln -c Debug");
     }
 
     private void RunSmokeTests()
@@ -2706,7 +3361,7 @@ public sealed class MainForm : Form
         }
         _terminal.WorkingDirectoryProvider = () => root;
         OpenBottomTab(2);
-        _terminal.Execute(@"dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Release -- .");
+        _terminal.Execute("dotnet run --project .\\PixelEngine.SmokeTests\\PixelEngine.SmokeTests.csproj -c Release -- .");
     }
 
     private void RunEditorBuild()
@@ -2715,7 +3370,7 @@ public sealed class MainForm : Form
         if (root is null) return;
         _terminal.WorkingDirectoryProvider = () => root;
         OpenBottomTab(2);
-        _terminal.Execute(@"dotnet build .\PixelEngine.Editor\PixelEngine.Editor.csproj -c Debug");
+        _terminal.Execute("dotnet build .\\PixelEngine.Editor\\PixelEngine.Editor.csproj -c Debug");
     }
 
     private void CommitHistory()
@@ -2904,6 +3559,11 @@ public sealed class MainForm : Form
 
     private void AddWorkerLog(string message)
     {
+        if (!_settings.GroupRepeatedLogs)
+        {
+            Log(message);
+            return;
+        }
         var now = DateTime.Now;
         if (_lastWorkerLogMessage is not null && string.Equals(_lastWorkerLogMessage, message, StringComparison.Ordinal) &&
             (now - _lastWorkerLogAt).TotalMilliseconds < 1400)
@@ -2939,11 +3599,27 @@ public sealed class MainForm : Form
             : message.Contains("warning", StringComparison.OrdinalIgnoreCase) ? "Warnings"
             : message.StartsWith("[Player", StringComparison.OrdinalIgnoreCase) ? "Player" : "Editor";
         _outputEntries.Add(new EditorLogEntry(DateTime.Now, category, message));
-        while (_outputEntries.Count > 2000) _outputEntries.RemoveAt(0);
+        while (_outputEntries.Count > _settings.MaxOutputEntries) _outputEntries.RemoveAt(0);
         RefreshOutputList();
     }
 
-    private void SetStatus(string text) => _status.Text = text;
+    private void SetStatus(string text)
+    {
+        _status.Text = text;
+        _status.ToolTipText = text;
+    }
+
+    /// <summary>Shows the live selection summary (scene / object / components) in the status bar.</summary>
+    private void UpdateSelectionStatus()
+    {
+        if (_selectionStatus is null || _project is null) return;
+        var scene = GetActiveScene();
+        var selected = _sceneCanvas.SelectedObject as LicObjectData;
+        _selectionStatus.Text = selected is not null
+            ? $"◆ {selected.Name} · {selected.Kind.ToUpperInvariant()} · {selected.Width:0}×{selected.Height:0}"
+            : scene is not null ? $"◇ {scene.Name} · {scene.Objects.Count} object(s)" : "◇ No scene";
+        _selectionStatus.ForeColor = selected is not null ? Theme.AccentBright : Theme.Muted;
+    }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
@@ -2954,6 +3630,7 @@ public sealed class MainForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         SaveDockLayout();
+        PersistSettings();
         _scriptHistoryTimer.Stop();
         _scriptHistoryTimer.Dispose();
         StopPreview();
@@ -2967,7 +3644,13 @@ public sealed class MainForm : Form
 
 internal sealed record EditorLogEntry(DateTime Timestamp, string Category, string Message);
 internal sealed record EditorSearchHit(string Kind, object Target, string Preview);
-internal sealed record BuildProblem(string FilePath, int Line, int Column, string Severity, string Code, string Message);
+internal sealed record BuildProblem(string FilePath, int Line, int Column, string Severity, string Code, string Message)
+{
+    /// <summary>Number of times MSBuild/Roslyn reported the identical diagnostic.</summary>
+    public int Occurrences { get; set; } = 1;
+
+    public string ShortLocation => $"{Path.GetFileName(FilePath)}:{Line}:{Column}";
+}
 
 internal sealed class EditorDockLayout
 {
@@ -3250,45 +3933,115 @@ internal sealed class SceneCanvas : Panel
         base.OnPaint(e);
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.Clear(ParseColor(ActiveScene()?.Background1) ?? Theme.Viewport);
+        var scene = ActiveScene();
+        var background = ParseColor(scene?.Background1) ?? Theme.Viewport;
+        g.Clear(background);
+        DrawViewportVignette(g, background);
+
         var center = new PointF(Width * .5f, Height * .53f);
         var gridStep = Math.Max(2f, GridSize * _zoom);
         var origin = WorldToScreen(0, 0);
-        if (ShowGrid && gridStep >= 4f)
-        {
-            using var minorGridPen = new Pen(Color.FromArgb(28, 130, 144, 164), 1f);
-            using var majorGridPen = new Pen(Color.FromArgb(52, 130, 144, 164), 1f);
-            var offsetX = Mod(center.X - _viewCenter.X * _zoom, gridStep);
-            var offsetY = Mod(center.Y - _viewCenter.Y * _zoom, gridStep);
-            var lineIndex = 0;
-            for (var x = offsetX; x < Width; x += gridStep, lineIndex++) g.DrawLine(lineIndex % 4 == 0 ? majorGridPen : minorGridPen, x, 0, x, Height);
-            lineIndex = 0;
-            for (var y = offsetY; y < Height; y += gridStep, lineIndex++) g.DrawLine(lineIndex % 4 == 0 ? majorGridPen : minorGridPen, 0, y, Width, y);
-        }
-        using var axisPen = new Pen(Color.FromArgb(90, 160, 174, 194), 1f);
-        g.DrawLine(axisPen, origin.X, 0, origin.X, Height);
-        g.DrawLine(axisPen, 0, origin.Y, Width, origin.Y);
-        using var axisFont = new Font("Segoe UI", 7f);
-        using var axisBrush = new SolidBrush(Color.FromArgb(150, 175, 190, 210));
-        g.DrawString("0,0", axisFont, axisBrush, origin.X + 4, origin.Y + 4);
+        if (ShowGrid && gridStep >= 4f) DrawGrid(g, center, gridStep);
+        DrawAxes(g, origin);
 
-        var scene = ActiveScene();
         if (scene is not null)
         {
-            foreach (var item in scene.Objects.OrderBy(item => item.Components?.FirstOrDefault(component => component.Type.Equals("SpriteRenderer", StringComparison.OrdinalIgnoreCase))?.SortingOrder ?? 0))
+            // Sort exactly like the runtime: SpriteRenderer.SortingOrder first, then Y so
+            // overlapping objects read the same way they will in the game.
+            var ordered = scene.Objects
+                .OrderBy(item => item.Components?.FirstOrDefault(component => component.Type.Equals("SpriteRenderer", StringComparison.OrdinalIgnoreCase))?.SortingOrder ?? 0)
+                .ThenBy(item => item.Y)
+                .ToArray();
+            foreach (var item in ordered)
                 DrawObject(g, item, center, _zoom, ReferenceEquals(item, SelectedObject));
-            if (ShowColliders) foreach (var item in scene.Objects) DrawColliders(g, item, center, _zoom);
+            if (ShowColliders)
+                foreach (var item in scene.Objects) DrawColliders(g, item, center, _zoom);
             if (SelectedObject is LicObjectData selected && scene.Objects.Contains(selected)) DrawGizmo(g, selected);
+            DrawSceneOverlay(g, scene);
+        }
+        else
+        {
+            DrawEmptyState(g);
+        }
+    }
+
+    private void DrawGrid(System.Drawing.Graphics g, PointF center, float gridStep)
+    {
+        using var minorPen = new Pen(Theme.GridMinor, 1f);
+        using var majorPen = new Pen(Theme.GridMajor, 1f);
+        var offsetX = Mod(center.X - _viewCenter.X * _zoom, gridStep);
+        var offsetY = Mod(center.Y - _viewCenter.Y * _zoom, gridStep);
+        var index = 0;
+        for (var x = offsetX; x < Width; x += gridStep, index++)
+            g.DrawLine(index % 4 == 0 ? majorPen : minorPen, x, 0, x, Height);
+        index = 0;
+        for (var y = offsetY; y < Height; y += gridStep, index++)
+            g.DrawLine(index % 4 == 0 ? majorPen : minorPen, 0, y, Width, y);
+    }
+
+    private void DrawAxes(System.Drawing.Graphics g, PointF origin)
+    {
+        using var axisPen = new Pen(Theme.WithAlpha(Theme.Accent, 70), 1f);
+        if (origin.X >= 0 && origin.X <= Width) g.DrawLine(axisPen, origin.X, 0, origin.X, Height);
+        if (origin.Y >= 0 && origin.Y <= Height) g.DrawLine(axisPen, 0, origin.Y, Width, origin.Y);
+        using var axisFont = Theme.Body(Theme.FontCaption);
+        using var axisBrush = new SolidBrush(Theme.Dim);
+        g.DrawString("0,0", axisFont, axisBrush, origin.X + Theme.Px(6), origin.Y + Theme.Px(4));
+    }
+
+    /// <summary>Subtle depth cue so the flat canvas does not read as an empty panel.</summary>
+    private void DrawViewportVignette(System.Drawing.Graphics g, Color background)
+    {
+        if (Width <= 0 || Height <= 0) return;
+        var top = Theme.Blend(background, Theme.Window, .45f);
+        var bottom = Theme.Blend(background, Color.White, .02f);
+        using var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
+            new Rectangle(0, 0, Width, Math.Max(1, Height)), top, bottom, 90f);
+        g.FillRectangle(brush, 0, 0, Width, Height);
+    }
+
+    private void DrawEmptyState(System.Drawing.Graphics g)
+    {
+        using var titleFont = Theme.Strong(Theme.FontTitle);
+        using var bodyFont = Theme.Body(Theme.FontBody);
+        using var titleBrush = new SolidBrush(Theme.TextStrong);
+        using var bodyBrush = new SolidBrush(Theme.Muted);
+        var box = new RectangleF(0, Height * .38f, Width, Theme.Px(120));
+        var flags = new StringFormat { Alignment = StringAlignment.Center };
+        g.DrawString("NO SCENE OPEN", titleFont, titleBrush, box, flags);
+        box.Y += Theme.Px(34);
+        g.DrawString("Create a scene with Scene → New Scene, or open a .lic project (Ctrl+O).",
+            bodyFont, bodyBrush, box, flags);
+    }
+
+    /// <summary>Scene chrome: viewport badge, object count and the keyboard hint bar.</summary>
+    private void DrawSceneOverlay(System.Drawing.Graphics g, LicSceneData scene)
+    {
+        var badge = new Rectangle(Theme.Px(12), Theme.Px(10), Theme.Px(430), Theme.Px(26));
+        Theme.PaintCard(g, badge, Theme.WithAlpha(Theme.Window, 210), Theme.Border, Theme.RadiusSmall);
+        using var badgeFont = Theme.Strong(Theme.FontSmall);
+        using var badgeBrush = new SolidBrush(Theme.Text);
+        var badgeText = $"  2D SCENE · {scene.Name}   ·   {scene.Objects.Count} object(s)   ·   {_zoom:0.0}x   ·   {ActiveTool}";
+        g.DrawString(badgeText, badgeFont, badgeBrush, badge.X + Theme.Px(6), badge.Y + Theme.Px(6));
+        using var dot = new SolidBrush(Theme.Accent);
+        g.FillEllipse(dot, badge.X + Theme.Px(9), badge.Y + badge.Height / 2 - Theme.Px(3), Theme.Px(6), Theme.Px(6));
+
+        var mouseWorld = MouseWorldPosition;
+        var coords = $"X {mouseWorld.X:0.0}   Y {mouseWorld.Y:0.0}   Grid {GridSize:0}";
+        var coordinates = new Rectangle(Width - Theme.Px(330), Height - Theme.Px(36), Theme.Px(318), Theme.Px(24));
+        if (coordinates.X > badge.Right)
+        {
+            Theme.PaintCard(g, coordinates, Theme.WithAlpha(Theme.Window, 190), Theme.WithAlpha(Theme.Border, 160), Theme.RadiusSmall);
+            using var coordFont = Theme.Mono(Theme.FontSmall);
+            using var coordBrush = new SolidBrush(Theme.Muted);
+            g.DrawString(coords, coordFont, coordBrush, coordinates.X + Theme.Px(8), coordinates.Y + Theme.Px(5));
         }
 
-        using var titleFont = new Font("Segoe UI Semibold", 9f);
-        using var titleBrush = new SolidBrush(Color.FromArgb(205, 215, 222, 232));
-        g.DrawString($"2D SCENE · {scene?.Name ?? "No scene"} · {scene?.Objects.Count ?? 0} objects · {_zoom:0.0}x · {ActiveTool}", titleFont, titleBrush, new PointF(14, 12));
-        using var hintFont = new Font("Segoe UI", 8f);
-        using var hintBrush = new SolidBrush(Color.FromArgb(155, 180, 190, 205));
-        g.DrawString("Q Select · W Move · E Rotate · R Scale · MMB drag: pan · wheel: zoom · F: focus · F2: rename · Ctrl+D: duplicate", hintFont, hintBrush, new PointF(14, Height - 24));
-        var mouseWorld = MouseWorldPosition;
-        g.DrawString($"X {mouseWorld.X:0.0}   Y {mouseWorld.Y:0.0}   Grid {GridSize:0}   Zoom {_zoom:0.00}x", hintFont, hintBrush, new PointF(Math.Max(14, Width - 280), Height - 24));
+        using var hintFont = Theme.Body(Theme.FontCaption);
+        using var hintBrush = new SolidBrush(Theme.Dim);
+        var hint = "Q/W/E/R tools · MMB pan · wheel zoom · F focus · F2 rename · Ctrl+D duplicate · Del remove";
+        var measured = g.MeasureString(hint, hintFont);
+        g.DrawString(hint, hintFont, hintBrush, Theme.Px(14), Height - measured.Height - Theme.Px(8));
     }
 
     private float Snap(float value) => SnapToGrid ? MathF.Round(value / Math.Max(1f, GridSize)) * Math.Max(1f, GridSize) : value;
@@ -3483,7 +4236,7 @@ internal sealed class SceneCanvas : Panel
         {
             case "circle": g.FillEllipse(brush, bounds); g.DrawEllipse(pen, bounds); break;
             case "text":
-                using (var font = new Font("Consolas", Math.Max(7f, Math.Min(14f, height * .55f)))) g.DrawString(item.Text ?? item.Name, font, brush, x - width * .5f, y - height * .5f);
+                using (var font = Theme.Mono(Math.Max(7f, Math.Min(14f, height * .55f)))) g.DrawString(item.Text ?? item.Name, font, brush, x - width * .5f, y - height * .5f);
                 break;
             case "poly": DrawPolygon(g, item, center, scale, pen); break;
             default:
@@ -3498,7 +4251,7 @@ internal sealed class SceneCanvas : Panel
                     g.DrawRectangle(pen, bounds.X, bounds.Y, bounds.Width, bounds.Height);
                     if (string.Equals(item.Kind, "sprite", StringComparison.OrdinalIgnoreCase))
                     {
-                        using var font = new Font("Segoe UI", 7f);
+                        using var font = Theme.Body(Theme.FontCaption);
                         g.DrawString("NO SPRITE", font, Brushes.White, bounds.X + 2, bounds.Y + 2);
                     }
                 }
@@ -3511,7 +4264,7 @@ internal sealed class SceneCanvas : Panel
         }
         if (ShowObjectLabels)
         {
-            using var labelFont = new Font("Segoe UI", 7.5f);
+            using var labelFont = Theme.Body(Theme.FontCaption);
             using var labelBrush = new SolidBrush(Color.FromArgb(210, 220, 225, 235));
             g.DrawString(item.Name, labelFont, labelBrush, x - width * .5f, y + height * .5f + 2);
         }
@@ -3591,23 +4344,4 @@ internal readonly struct GraphicsStateScope : IDisposable
         _state = graphics.Save();
     }
     public void Dispose() => _graphics.Restore(_state);
-}
-
-internal static class Theme
-{
-    public static readonly Color Window = Color.FromArgb(26, 27, 31);
-    public static readonly Color Panel = Color.FromArgb(34, 35, 40);
-    public static readonly Color Toolbar = Color.FromArgb(42, 43, 49);
-    public static readonly Color Viewport = Color.FromArgb(20, 21, 25);
-    public static readonly Color Terminal = Color.FromArgb(17, 18, 21);
-    public static readonly Color TabActive = Color.FromArgb(29, 31, 36);
-    public static readonly Color Selection = Color.FromArgb(48, 63, 82);
-    public static readonly Color Border = Color.FromArgb(52, 54, 61);
-    public static readonly Color Accent = Color.FromArgb(78, 156, 224);
-    public static readonly Color AccentDark = Color.FromArgb(42, 101, 153);
-    public static readonly Color Success = Color.FromArgb(120, 205, 145);
-    public static readonly Color Warning = Color.FromArgb(230, 181, 95);
-    public static readonly Color Danger = Color.FromArgb(235, 112, 112);
-    public static readonly Color Text = Color.FromArgb(222, 226, 234);
-    public static readonly Color Muted = Color.FromArgb(142, 151, 166);
 }

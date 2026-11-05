@@ -41,22 +41,37 @@ public static class AnimationEvaluator
         var t = clip.Loop ? PositiveModulo(time, duration) : Math.Clamp(time, 0f, duration);
 
         // Resolve every channel independently. A blank keyframe or a keyframe that only
-        // animates X must not pull Y/rotation/scale toward the live baseline.
+        // animates X must not pull Y/rotation/scale toward the live baseline, and a blank
+        // keyframe never acts as a held step that pins a channel to zero.
+        var x = EvaluateChannel(clip.Keyframes, t, duration, baseline.Position.X, static key => key.X, out var xMatches);
+        var y = EvaluateChannel(clip.Keyframes, t, duration, baseline.Position.Y, static key => key.Y, out var yMatches);
+        // Position is a single 2D channel for authored motion: a key that animates only X
+        // still publishes the resolved Y so a lerp cannot snap Y toward the interpolated
+        // value of a neighbour key that left Y unkeyed.
+        if (xMatches || yMatches)
+        {
+            if (!xMatches) x = baseline.Position.X;
+            if (!yMatches) y = baseline.Position.Y;
+        }
         return new AnimationPose(
-            new Vector2(
-                EvaluateChannel(clip.Keyframes, t, duration, baseline.Position.X, static key => key.X),
-                EvaluateChannel(clip.Keyframes, t, duration, baseline.Position.Y, static key => key.Y)),
+            new Vector2(x, y),
             EvaluateAngleChannel(clip.Keyframes, t, duration, baseline.Rotation),
             new Vector2(
-                Math.Clamp(EvaluateChannel(clip.Keyframes, t, duration, baseline.Scale.X, static key => key.ScaleX), -100f, 100f),
-                Math.Clamp(EvaluateChannel(clip.Keyframes, t, duration, baseline.Scale.Y, static key => key.ScaleY), -100f, 100f)));
+                Math.Clamp(EvaluateChannel(clip.Keyframes, t, duration, baseline.Scale.X, static key => key.ScaleX, out _), -100f, 100f),
+                Math.Clamp(EvaluateChannel(clip.Keyframes, t, duration, baseline.Scale.Y, static key => key.ScaleY, out _), -100f, 100f)));
     }
 
+    /// <summary>
+    /// Evaluates one scalar channel. Blank keyframes are transparent: they neither start a
+    /// channel nor terminate a held value, so <c>{X:10}@{0s}, {}@{1s}, {X:30}@{2s}</c>
+    /// interpolates X linearly from 10 to 30 instead of dropping it to zero at the blank key.
+    /// </summary>
     private static float EvaluateChannel(IReadOnlyList<LicAnimationKeyframeData> keys, float time,
-        float duration, float baseline, Func<LicAnimationKeyframeData, float?> selector)
+        float duration, float baseline, Func<LicAnimationKeyframeData, float?> selector, out bool channelIsKeyed)
     {
-        LicAnimationKeyframeData? before = null;
-        LicAnimationKeyframeData? after = null;
+        channelIsKeyed = false;
+        float? beforeValue = null;
+        float? afterValue = null;
         var beforeTime = float.NegativeInfinity;
         var afterTime = float.PositiveInfinity;
 
@@ -65,30 +80,30 @@ public static class AnimationEvaluator
             if (key is null || !float.IsFinite(key.Time)) continue;
             var value = selector(key);
             if (!value.HasValue || !float.IsFinite(value.Value)) continue;
+            channelIsKeyed = true;
             var keyTime = Math.Clamp(key.Time, 0f, duration);
             // >= and <= intentionally make the last serialized key win when timestamps repeat.
-            if (keyTime <= time && keyTime >= beforeTime) { beforeTime = keyTime; before = key; }
-            if (keyTime >= time && keyTime <= afterTime) { afterTime = keyTime; after = key; }
+            if (keyTime <= time && keyTime >= beforeTime) { beforeTime = keyTime; beforeValue = value.Value; }
+            if (keyTime >= time && keyTime <= afterTime) { afterTime = keyTime; afterValue = value.Value; }
         }
 
-        if (before is null && after is null) return baseline;
-        // A channel is not animated before its first authored key. Keep the live
-        // baseline untouched rather than blending toward a future key; this matters
-        // for partially keyed clips layered over physics/player movement.
-        if (before is null) return baseline;
-        if (after is null) return selector(before)!.Value;
-        var from = selector(before)!.Value;
-        var to = selector(after)!.Value;
-        if (ReferenceEquals(before, after) || afterTime - beforeTime <= 0.0001f) return to;
+        // A channel is not animated before its first authored key. Keep the live baseline
+        // untouched rather than blending toward a future key; this matters for partially
+        // keyed clips layered over physics or player movement.
+        if (beforeValue is null) return baseline;
+        // Keys authored at the sample time win outright (hard hold); interpolation only
+        // happens strictly between two distinct authored times.
+        if (afterValue is null || afterTime - beforeTime <= 0.0001f) return afterValue ?? beforeValue.Value;
         var amount = Math.Clamp((time - beforeTime) / (afterTime - beforeTime), 0f, 1f);
-        return from + (to - from) * amount;
+        return beforeValue.Value + (afterValue.Value - beforeValue.Value) * amount;
     }
 
+    /// <summary>Rotation channel using shortest-arc interpolation; blank keys stay transparent.</summary>
     private static float EvaluateAngleChannel(IReadOnlyList<LicAnimationKeyframeData> keys, float time,
         float duration, float baseline)
     {
-        LicAnimationKeyframeData? before = null;
-        LicAnimationKeyframeData? after = null;
+        float? beforeValue = null;
+        float? afterValue = null;
         var beforeTime = float.NegativeInfinity;
         var afterTime = float.PositiveInfinity;
 
@@ -96,19 +111,15 @@ public static class AnimationEvaluator
         {
             if (key is null || !float.IsFinite(key.Time) || !key.Rotation.HasValue || !float.IsFinite(key.Rotation.Value)) continue;
             var keyTime = Math.Clamp(key.Time, 0f, duration);
-            if (keyTime <= time && keyTime >= beforeTime) { beforeTime = keyTime; before = key; }
-            if (keyTime >= time && keyTime <= afterTime) { afterTime = keyTime; after = key; }
+            if (keyTime <= time && keyTime >= beforeTime) { beforeTime = keyTime; beforeValue = key.Rotation.Value; }
+            if (keyTime >= time && keyTime <= afterTime) { afterTime = keyTime; afterValue = key.Rotation.Value; }
         }
 
-        if (before is null && after is null) return baseline;
         // Match scalar channels: rotation remains live until its first authored key.
-        if (before is null) return baseline;
-        if (after is null) return NormalizeAngle(before.Rotation!.Value);
-        var from = NormalizeAngle(before.Rotation!.Value);
-        var to = NormalizeAngle(after.Rotation!.Value);
-        if (ReferenceEquals(before, after) || afterTime - beforeTime <= 0.0001f) return to;
+        if (beforeValue is null) return baseline;
+        if (afterValue is null || afterTime - beforeTime <= 0.0001f) return NormalizeAngle(afterValue ?? beforeValue.Value);
         var amount = Math.Clamp((time - beforeTime) / (afterTime - beforeTime), 0f, 1f);
-        return LerpAngle(from, to, amount);
+        return LerpAngle(NormalizeAngle(beforeValue.Value), NormalizeAngle(afterValue.Value), amount);
     }
 
     private static float NormalizeAngle(float value) => PositiveModulo(value, 360f);

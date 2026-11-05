@@ -13,9 +13,9 @@ internal sealed class CodeEditorControl : UserControl
 {
     private readonly ToolStrip _toolbar = new();
     private readonly ToolStripLabel _languageLabel = new("LUA");
-    private readonly ToolStripComboBox _outlineSelector = new() { AutoSize = false, Width = 190, DropDownStyle = ComboBoxStyle.DropDownList, ToolTipText = "Script outline — jump to a function" };
-    private readonly TextBox _findBox = new() { Width = 220, BorderStyle = BorderStyle.FixedSingle };
-    private readonly TextBox _replaceBox = new() { Width = 220, BorderStyle = BorderStyle.FixedSingle };
+    private readonly ToolStripComboBox _outlineSelector = new() { AutoSize = false, Width = Theme.Px(196), DropDownStyle = ComboBoxStyle.DropDownList, ToolTipText = "Script outline — jump to a function" };
+    private readonly TextBox _findBox = new() { Width = Theme.Px(220), BorderStyle = BorderStyle.FixedSingle };
+    private readonly TextBox _replaceBox = new() { Width = Theme.Px(220), BorderStyle = BorderStyle.FixedSingle };
     private Button? _findNextButton;
     private Button? _findPreviousButton;
     private Button? _replaceCurrentButton;
@@ -72,6 +72,18 @@ internal sealed class CodeEditorControl : UserControl
     {
         if (_editor.CanRedo) _editor.Redo();
         _editor.Focus();
+    }
+
+    /// <summary>Applies persisted preferences (font size and word wrap).</summary>
+    public void ApplyPreferences(float fontSize, bool wordWrap, bool showLineNumbers = true)
+    {
+        var size = float.IsFinite(fontSize) ? Math.Clamp(fontSize, 7f, 32f) : 10f;
+        _editor.Font = Theme.Mono(size);
+        _editor.WordWrap = wordWrap;
+        // Word wrap changes the gutter mapping, so the gutter is hidden rather than left stale.
+        _gutter.Visible = showLineNumbers;
+        _gutter.Width = Theme.Px(50);
+        _gutter.Invalidate();
     }
 
     public bool EditorReadOnly
@@ -234,7 +246,7 @@ internal sealed class CodeEditorControl : UserControl
     {
         _toolbar.Dock = DockStyle.Top;
         _toolbar.AutoSize = false;
-        _toolbar.Height = 38;
+        _toolbar.Height = Theme.Px(40);
         _toolbar.Renderer = StudioToolStripStyle.CreateRenderer();
         _toolbar.GripStyle = ToolStripGripStyle.Hidden;
         _toolbar.BackColor = Theme.Toolbar;

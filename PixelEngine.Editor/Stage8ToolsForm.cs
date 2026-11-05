@@ -15,23 +15,23 @@ public sealed class Stage8ToolsForm : Form
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
     private readonly ListView _diagnostics = new() { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = true };
     private readonly ListBox _animations = new() { Dock = DockStyle.Fill, DisplayMember = nameof(LicAnimationClipData.Name) };
-    private readonly PropertyGrid _animationProperties = new() { Dock = DockStyle.Top, Height = 190, ToolbarVisible = false };
+    private readonly PropertyGrid _animationProperties = new() { Dock = DockStyle.Top, Height = Theme.Px(196), ToolbarVisible = false };
     private readonly DataGridView _keyframes = new() { Dock = DockStyle.Fill, AllowUserToAddRows = true, AllowUserToDeleteRows = true, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-    private readonly Panel _animationTimeline = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(22, 25, 31), Cursor = Cursors.Cross };
-    private readonly Label _timelineReadout = new() { Dock = DockStyle.Top, Height = 22, ForeColor = Color.Silver, TextAlign = ContentAlignment.MiddleLeft, Text = "Timeline · click to move playhead" };
+    private readonly Panel _animationTimeline = new() { Dock = DockStyle.Fill, BackColor = Theme.Viewport, Cursor = Cursors.Cross };
+    private readonly Label _timelineReadout = new() { Dock = DockStyle.Top, Height = Theme.Px(24), ForeColor = Theme.Muted, TextAlign = ContentAlignment.MiddleLeft, Text = "Timeline · click to move playhead" };
     private readonly ListBox _lights = new() { Dock = DockStyle.Fill, DisplayMember = nameof(LicLightData.Name) };
     private readonly PropertyGrid _lightProperties = new() { Dock = DockStyle.Fill, ToolbarVisible = false };
-    private readonly NumericUpDown _ambientLight = new() { Minimum = 0, Maximum = 1, DecimalPlaces = 2, Increment = .05m, Width = 72, TextAlign = HorizontalAlignment.Center };
+    private readonly NumericUpDown _ambientLight = new() { Minimum = 0, Maximum = 1, DecimalPlaces = 2, Increment = .05m, Width = Theme.Px(76), TextAlign = HorizontalAlignment.Center };
     private readonly ListBox _emitters = new() { Dock = DockStyle.Fill, DisplayMember = nameof(LicParticleEmitterData.Name) };
     private readonly PropertyGrid _emitterProperties = new() { Dock = DockStyle.Fill, ToolbarVisible = false };
     private readonly ListBox _tileMaps = new() { Dock = DockStyle.Fill, DisplayMember = nameof(LicTileMapData.Name) };
-    private readonly PropertyGrid _tileMapProperties = new() { Dock = DockStyle.Top, Height = 190, ToolbarVisible = false };
+    private readonly PropertyGrid _tileMapProperties = new() { Dock = DockStyle.Top, Height = Theme.Px(196), ToolbarVisible = false };
     private readonly DataGridView _tileGrid = new() { Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false, RowHeadersVisible = true, ColumnHeadersVisible = true };
-    private readonly NumericUpDown _tileBrushIndex = new() { Minimum = 0, Maximum = 255, Width = 58, TextAlign = HorizontalAlignment.Center };
-    private readonly CheckBox _tilePaintMode = new() { Text = "Paint mode", AutoSize = true, ForeColor = Color.Gainsboro, BackColor = Color.Transparent, Checked = false, Margin = new Padding(8, 5, 4, 0) };
-    private readonly Label _tileMapHint = new() { Dock = DockStyle.Top, Height = 24, ForeColor = Color.Silver, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly NumericUpDown _tileBrushIndex = new() { Minimum = 0, Maximum = 255, Width = Theme.Px(62), TextAlign = HorizontalAlignment.Center };
+    private readonly CheckBox _tilePaintMode = new() { Text = "Paint mode", AutoSize = true, ForeColor = Theme.Text, BackColor = Color.Transparent, Checked = false, Margin = new Padding(8, 5, 4, 0) };
+    private readonly Label _tileMapHint = new() { Dock = DockStyle.Top, Height = Theme.Px(26), ForeColor = Theme.Muted, TextAlign = ContentAlignment.MiddleLeft };
     private readonly System.Windows.Forms.Timer _profilerTimer = new() { Interval = 500 };
-    private readonly Label _profilerSummary = new() { Dock = DockStyle.Fill, AutoSize = false, Padding = new Padding(18), Font = new Font("Consolas", 11f) };
+    private readonly Label _profilerSummary = new() { Dock = DockStyle.Fill, AutoSize = false, Padding = new Padding(Theme.Px(18)), Font = Theme.Mono(11f) };
     private bool _buildingGrid;
     private int _boundTileWidth;
     private int _boundTileHeight;
@@ -55,11 +55,12 @@ public sealed class Stage8ToolsForm : Form
         _ambientLight.ValueChanged += (_, _) => { _project.EditorData.AmbientLight = (float)_ambientLight.Value; MarkChanged(); };
         Text = "PixelEngine Studio Tools";
         StartPosition = FormStartPosition.CenterParent;
-        Size = new Size(1120, 760);
-        MinimumSize = new Size(850, 560);
-        BackColor = Color.FromArgb(31, 34, 41);
-        ForeColor = Color.Gainsboro;
-        Font = new Font("Segoe UI", 9f);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        Size = new Size(Theme.Px(1120), Theme.Px(760));
+        MinimumSize = new Size(Theme.Px(860), Theme.Px(560));
+        BackColor = Theme.Background;
+        ForeColor = Theme.Text;
+        Font = Theme.Body();
         BuildDiagnosticsTab();
         BuildAnimationTab();
         BuildObjectDataTab("Lighting", _lights, _lightProperties, AddLight, RemoveLight, _project.EditorData.Lights);
@@ -77,7 +78,7 @@ public sealed class Stage8ToolsForm : Form
     private void BuildDiagnosticsTab()
     {
         var page = new TabPage("Diagnostics") { BackColor = BackColor, ForeColor = ForeColor };
-        _diagnostics.Columns.Add("Severity", 85);
+        _diagnostics.Columns.Add("Severity", Theme.Px(88));
         _diagnostics.Columns.Add("Code", 75);
         _diagnostics.Columns.Add("Location", 220);
         _diagnostics.Columns.Add("Message", 390);
@@ -107,9 +108,9 @@ public sealed class Stage8ToolsForm : Form
             row.SubItems.Add(issue.Suggestion);
             row.ForeColor = issue.Severity switch
             {
-                DiagnosticSeverity.Error => Color.FromArgb(255, 135, 135),
-                DiagnosticSeverity.Warning => Color.FromArgb(255, 205, 120),
-                _ => Color.FromArgb(145, 210, 165)
+                DiagnosticSeverity.Error => Theme.Danger,
+                DiagnosticSeverity.Warning => Theme.Warning,
+                _ => Theme.Success
             };
             _diagnostics.Items.Add(row);
         }
@@ -120,7 +121,7 @@ public sealed class Stage8ToolsForm : Form
             success.SubItems.Add("Project");
             success.SubItems.Add("No issues found.");
             success.SubItems.Add("No action required.");
-            success.ForeColor = Color.FromArgb(145, 210, 165);
+            success.ForeColor = Theme.Success;
             _diagnostics.Items.Add(success);
         }
         _diagnostics.EndUpdate();
@@ -173,7 +174,7 @@ public sealed class Stage8ToolsForm : Form
     private void BuildAnimationTab()
     {
         var page = new TabPage("Animation") { BackColor = BackColor, ForeColor = ForeColor };
-        var split = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1000, 600), Panel1MinSize = 170, Panel2MinSize = 220, SplitterDistance = 250, BackColor = BackColor };
+        var split = ConfigureSplit(new SplitContainer { Dock = DockStyle.Fill, BackColor = BackColor }, 250);
         var left = new Panel { Dock = DockStyle.Fill };
         var buttons = CreateButtonBar();
         buttons.Controls.Add(MakeButton("New clip", (_, _) => AddAnimation()));
@@ -186,8 +187,8 @@ public sealed class Stage8ToolsForm : Form
         var right = new Panel { Dock = DockStyle.Fill };
         var keyFramePanel = new Panel { Dock = DockStyle.Fill };
         keyFramePanel.Controls.Add(_keyframes);
-        keyFramePanel.Controls.Add(new Label { Dock = DockStyle.Top, Height = 24, Text = "KEYFRAME VALUES · seconds / transform channels", ForeColor = Color.Silver, TextAlign = ContentAlignment.MiddleLeft });
-        var timelineHost = new Panel { Dock = DockStyle.Fill, Height = 92, BackColor = Color.FromArgb(28, 32, 40), Padding = new Padding(6, 2, 6, 4) };
+        keyFramePanel.Controls.Add(new Label { Dock = DockStyle.Top, Height = Theme.Px(24), Text = "KEYFRAME VALUES · seconds / transform channels", ForeColor = Theme.Muted, TextAlign = ContentAlignment.MiddleLeft });
+        var timelineHost = new Panel { Dock = DockStyle.Fill, Height = Theme.Px(96), BackColor = Theme.Viewport, Padding = new Padding(6, 2, 6, 4) };
         timelineHost.Controls.Add(_animationTimeline);
         timelineHost.Controls.Add(_timelineReadout);
         var rightLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = BackColor, Margin = Padding.Empty };
@@ -308,11 +309,11 @@ public sealed class Stage8ToolsForm : Form
         const float rightInset = 16f;
         var right = Math.Max(left + 1f, _animationTimeline.ClientSize.Width - rightInset);
         var y = Math.Max(30f, _animationTimeline.ClientSize.Height * .62f);
-        using var axisPen = new Pen(Color.FromArgb(90, 104, 124), 1f);
-        using var tickPen = new Pen(Color.FromArgb(65, 76, 92), 1f);
-        using var keyBrush = new SolidBrush(Color.FromArgb(245, 188, 85));
-        using var playheadPen = new Pen(Color.FromArgb(95, 185, 255), 2f);
-        using var textBrush = new SolidBrush(Color.FromArgb(175, 185, 198));
+        using var axisPen = new Pen(Theme.Border, 1f);
+        using var tickPen = new Pen(Theme.BorderSoft, 1f);
+        using var keyBrush = new SolidBrush(Theme.Warning);
+        using var playheadPen = new Pen(Theme.Accent, 2f);
+        using var textBrush = new SolidBrush(Theme.Muted);
         graphics.DrawLine(axisPen, left, y, right, y);
         const int ticks = 10;
         for (var i = 0; i <= ticks; i++)
@@ -399,7 +400,7 @@ public sealed class Stage8ToolsForm : Form
     private void BuildObjectDataTab<T>(string title, ListBox list, PropertyGrid properties, Action add, Action remove, List<T> items) where T : class
     {
         var page = new TabPage(title) { BackColor = BackColor, ForeColor = ForeColor };
-        var split = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1000, 600), Panel1MinSize = 170, Panel2MinSize = 220, SplitterDistance = 280, BackColor = BackColor };
+        var split = ConfigureSplit(new SplitContainer { Dock = DockStyle.Fill, BackColor = BackColor }, 280);
         var left = new Panel { Dock = DockStyle.Fill };
         var buttons = CreateButtonBar();
         buttons.Controls.Add(MakeButton("Add", (_, _) => add()));
@@ -414,10 +415,10 @@ public sealed class Stage8ToolsForm : Form
         page.Controls.Add(split);
         if (string.Equals(title, "Lighting", StringComparison.OrdinalIgnoreCase))
         {
-            var ambientBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 38, BackColor = Color.FromArgb(38, 42, 50), Padding = new Padding(8, 5, 4, 3), WrapContents = false };
-            ambientBar.Controls.Add(new Label { Text = "Ambient light", AutoSize = true, ForeColor = Color.Gainsboro, Margin = new Padding(2, 5, 8, 0) });
+            var ambientBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.Px(42), BackColor = Theme.Toolbar, Padding = new Padding(8, 5, 4, 3), WrapContents = false };
+            ambientBar.Controls.Add(new Label { Text = "Ambient light", AutoSize = true, ForeColor = Theme.Text, Margin = new Padding(2, 5, 8, 0) });
             ambientBar.Controls.Add(_ambientLight);
-            ambientBar.Controls.Add(new Label { Text = "0 = dark · 1 = fully lit", AutoSize = true, ForeColor = Color.Silver, Margin = new Padding(8, 5, 2, 0) });
+            ambientBar.Controls.Add(new Label { Text = "0 = dark · 1 = fully lit", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(8, 5, 2, 0) });
             page.Controls.Add(ambientBar);
             split.Dock = DockStyle.Fill;
         }
@@ -455,7 +456,7 @@ public sealed class Stage8ToolsForm : Form
     private void BuildTileMapTab()
     {
         var page = new TabPage("TileMap") { BackColor = BackColor, ForeColor = ForeColor };
-        var split = new SplitContainer { Dock = DockStyle.Fill, Size = new Size(1000, 600), Panel1MinSize = 170, Panel2MinSize = 220, SplitterDistance = 250, BackColor = BackColor };
+        var split = ConfigureSplit(new SplitContainer { Dock = DockStyle.Fill, BackColor = BackColor }, 250);
         var left = new Panel { Dock = DockStyle.Fill };
         var buttons = CreateButtonBar();
         buttons.Controls.Add(MakeButton("New map", (_, _) => AddTileMap()));
@@ -463,8 +464,8 @@ public sealed class Stage8ToolsForm : Form
         buttons.Controls.Add(_removeTileMapButton);
         left.Controls.Add(_tileMaps); left.Controls.Add(buttons);
         var right = new Panel { Dock = DockStyle.Fill };
-        var tileTools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 64, WrapContents = true, BackColor = Color.FromArgb(38, 42, 50), Padding = new Padding(4, 2, 4, 2) };
-        tileTools.Controls.Add(new Label { Text = "Brush index", AutoSize = true, ForeColor = Color.Silver, Margin = new Padding(2, 7, 2, 0) });
+        var tileTools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.Px(68), WrapContents = true, BackColor = Theme.Toolbar, Padding = new Padding(4, 2, 4, 2) };
+        tileTools.Controls.Add(new Label { Text = "Brush index", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(2, 7, 2, 0) });
         tileTools.Controls.Add(_tileBrushIndex);
         tileTools.Controls.Add(_tilePaintMode);
         _fillTileMapButton = MakeButton("Fill map", (_, _) => FillTileMap());
@@ -572,7 +573,7 @@ public sealed class Stage8ToolsForm : Form
             _tileMapHint.Text = map.Width > visibleWidth || map.Height > visibleHeight
                 ? $"Showing {visibleWidth}×{visibleHeight} cells from top-left (map: {map.Width}×{map.Height}). Runtime supports the full map."
                 : $"Grid: {map.Width}×{map.Height} · Enter a palette index (0 = empty).";
-            for (var x = 0; x < visibleWidth; x++) _tileGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "C" + x, HeaderText = x.ToString(), Width = 34, SortMode = DataGridViewColumnSortMode.NotSortable });
+            for (var x = 0; x < visibleWidth; x++) _tileGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "C" + x, HeaderText = x.ToString(), Width = Theme.Px(36), SortMode = DataGridViewColumnSortMode.NotSortable });
             for (var y = 0; y < visibleHeight; y++)
             {
                 var row = new object[visibleWidth];
@@ -681,7 +682,7 @@ public sealed class Stage8ToolsForm : Form
     private void BuildProfilerTab()
     {
         var page = new TabPage("Profiler") { BackColor = BackColor, ForeColor = ForeColor };
-        _profilerSummary.ForeColor = Color.FromArgb(210, 220, 230);
+        _profilerSummary.ForeColor = Theme.Text;
         _profilerSummary.Text = "Collecting editor metrics…";
         page.Controls.Add(_profilerSummary);
         _tabs.TabPages.Add(page);
@@ -767,11 +768,30 @@ public sealed class Stage8ToolsForm : Form
         for (var i = 1; ; i++) { var value = $"{basis} {i}"; if (!existing.Contains(value)) return value; }
     }
 
-    private static FlowLayoutPanel CreateButtonBar() => new() { Dock = DockStyle.Top, Height = 36, WrapContents = false, AutoScroll = true, BackColor = Color.FromArgb(38, 42, 50), Padding = new Padding(4) };
+    /// <summary>
+    /// Applies DPI-scaled panel minimums and defers the splitter distance until the control has a
+    /// handle; assigning it in the initializer lets WinForms clamp it against the 1000×600 design
+    /// size, which clipped panels on high-DPI displays.
+    /// </summary>
+    private static SplitContainer ConfigureSplit(SplitContainer split, int designDistance)
+    {
+        split.Panel1MinSize = Theme.Px(170);
+        split.Panel2MinSize = Theme.Px(220);
+        split.SplitterWidth = Theme.Px(6);
+        split.HandleCreated += (_, _) =>
+        {
+            var desired = Theme.Px(designDistance);
+            var maximum = split.Height - split.Panel2MinSize - split.SplitterWidth;
+            if (maximum > split.Panel1MinSize) split.SplitterDistance = Math.Clamp(desired, split.Panel1MinSize, maximum);
+        };
+        return split;
+    }
+
+    private static FlowLayoutPanel CreateButtonBar() => new() { Dock = DockStyle.Top, Height = Theme.Px(40), WrapContents = false, AutoScroll = true, BackColor = Theme.Toolbar, Padding = new Padding(4) };
     private static Button MakeButton(string text, EventHandler click)
     {
-        var button = new Button { Text = text, AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(54, 60, 72), ForeColor = Color.Gainsboro, Margin = new Padding(3) };
-        button.FlatAppearance.BorderColor = Color.FromArgb(75, 84, 99);
+        var button = new Button { Text = text, AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = Theme.PanelAlt, ForeColor = Theme.Text, Margin = new Padding(3) };
+        button.FlatAppearance.BorderColor = Theme.Border;
         button.Click += click;
         return button;
     }
