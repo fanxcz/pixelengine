@@ -250,18 +250,35 @@ try
             throw new InvalidOperationException("The explicit project argument was not selected.");
     });
 
-    Check("project fixtures still load through the editor's project reader", () =>
+    Check("all bundled Lic and Games projects load through the project reader", () =>
     {
         var root = FindRepositoryRoot();
         if (root is null) throw new InvalidOperationException("Repository root not found.");
-        var licDirectory = Path.Combine(root, "Lic");
-        var fixtures = Directory.GetFiles(licDirectory, "*.lic").OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
-        if (fixtures.Length == 0) throw new InvalidOperationException("No .lic fixtures found.");
+        var sampleDirectories = new[] { "Lic", "Games" }
+            .Select(name => Path.Combine(root, name))
+            .Where(Directory.Exists)
+            .ToArray();
+        var fixtures = sampleDirectories
+            .SelectMany(directory => Directory.GetFiles(directory, "*.lic", SearchOption.AllDirectories))
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (fixtures.Length < 9) throw new InvalidOperationException($"Expected the built-in LIC samples and Ashfall; found {fixtures.Length}.");
         foreach (var fixture in fixtures)
         {
             var project = LicProjectReader.Load(fixture);
             if (project.Scenes.Count == 0) throw new InvalidOperationException($"'{Path.GetFileName(fixture)}' has no scenes.");
             if (project.Scenes.Any(scene => scene.Objects is null)) throw new InvalidOperationException($"'{Path.GetFileName(fixture)}' has a null object list.");
+
+            if (fixture.Contains(Path.Combine("Games", "Ashfall"), StringComparison.OrdinalIgnoreCase))
+            {
+                if (project.Scripts.Count == 0) throw new InvalidOperationException("Ashfall has no embedded gameplay script.");
+                if (project.Assets.Count == 0) throw new InvalidOperationException("Ashfall has no embedded game assets.");
+                var lua = Path.Combine(root, "Games", "Ashfall", "Game", "game.lua");
+                if (!File.Exists(lua)) throw new FileNotFoundException("Ashfall editable Lua source is missing.", lua);
+                var assets = Path.Combine(root, "Games", "Ashfall", "Assets");
+                if (!Directory.Exists(assets) || !Directory.EnumerateFiles(assets).Any())
+                    throw new DirectoryNotFoundException("Ashfall editable Assets folder is missing or empty.");
+            }
         }
     });
 }
