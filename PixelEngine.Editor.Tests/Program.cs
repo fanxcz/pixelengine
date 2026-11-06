@@ -199,12 +199,12 @@ try
 
     Check("script highlighting only formats complete visible lines", () =>
     {
-        const string source = "header\\r\\nfunction start()\\r\\n    api.log('ready')\\r\\nend\\r\\nfooter";
+        const string source = "header\r\nfunction start()\r\n    api.log('ready')\r\nend\r\nfooter";
         var firstVisible = source.IndexOf("function", StringComparison.Ordinal) + 3;
         var lastVisible = source.IndexOf("api.log", StringComparison.Ordinal) + 5;
         var range = CodeEditorControl.GetVisibleTextRange(source, firstVisible, lastVisible);
         var visible = source.Substring(range.Start, range.Length);
-        if (visible != "function start()\\r\\n    api.log('ready')\\r\\n")
+        if (visible != "function start()\r\n    api.log('ready')\r\n")
             throw new InvalidOperationException("Visible syntax range did not expand to exactly the intersecting full lines: " + visible);
 
         var clamped = CodeEditorControl.GetVisibleTextRange(source, -100, int.MaxValue);
