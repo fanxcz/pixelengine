@@ -3219,7 +3219,7 @@ public sealed class MainForm : Form
             {
                 start = new ProcessStartInfo(bundledPlayer)
                 {
-                    WorkingDirectory = applicationDirectory,
+                    WorkingDirectory = Path.GetDirectoryName(bundledPlayer) ?? applicationDirectory,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
