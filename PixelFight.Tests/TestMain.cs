@@ -15,9 +15,17 @@ static class TestMain
         try
         {
             var proj = LicProject.NewSample();
-            if (!System.IO.File.Exists("Lic/demo.lic")) proj.Save("Lic/demo.lic"); // пример проекта
-            var back = LicProject.Load("Lic/demo.lic");
-            if (back.scenes.Count != 1 || back.scripts.Count != 2) { Console.WriteLine("FAIL: lic load"); return 3; }
+            // Do not read Lic/demo.lic here: that path belongs to the newer PixelEngine 2.0
+            // demo and intentionally has a different schema/content. Keep this legacy fixture
+            // isolated so the test can run beside both generations of projects.
+            var legacyFixtureDirectory = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(), "PixelFightTests", Guid.NewGuid().ToString("N"));
+            System.IO.Directory.CreateDirectory(legacyFixtureDirectory);
+            var legacyFixturePath = System.IO.Path.Combine(legacyFixtureDirectory, "legacy-demo.lic");
+            proj.Save(legacyFixturePath);
+            var back = LicProject.Load(legacyFixturePath);
+            System.IO.Directory.Delete(legacyFixtureDirectory, recursive: true);
+            if (back.scenes.Count != 1 || back.scripts.Count != 2) { Console.WriteLine("FAIL: legacy lic round-trip"); return 3; }
             foreach (var s in back.scripts)
             {
                 string err = ScriptFactory.CheckCode(s.lang, s.code);
