@@ -48,11 +48,25 @@ internal sealed class CodeEditorControl : UserControl
         set
         {
             _settingCode = true;
-            _editor.Text = value ?? string.Empty;
-            _settingCode = false;
+            try
+            {
+                _editor.Text = value ?? string.Empty;
+            }
+            finally
+            {
+                _settingCode = false;
+            }
+
+            // A newly opened script must not inherit the previous file's selection, scroll
+            // position or bracket markers. Old bracket offsets can be valid in the new file and
+            // cause the highlight pass to jump to an unrelated location.
+            _bracketA = _bracketB = -1;
             _bookmarks.Clear();
             _diagnosticLines.Clear();
             _completionPopup.Close();
+            if (_outlineSelector.Items.Count > 0) _outlineSelector.SelectedIndex = -1;
+            _editor.Select(0, 0);
+            _editor.ScrollToCaret();
             _gutter.Invalidate();
             ScheduleHighlight();
             UpdateStatus();
