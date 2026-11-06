@@ -2,18 +2,18 @@
 
 **PixelEngine** — 2D game engine with a Windows Studio editor, a separate MonoGame player and editable LIC projects. The repository includes the engine, authoring environment, sample projects and automated checks.
 
-[Сайт проекта](https://fanxcz.github.io/pixelengine/) · [Скачать релиз](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.3) · [Исходный код](https://github.com/fanxcz/pixelengine)
+[Сайт проекта](https://fanxcz.github.io/pixelengine/) · [Скачать релиз](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.4) · [Исходный код](https://github.com/fanxcz/pixelengine)
 
-> **Текущая версия:** v2.0.0-preview.3 — предварительная сборка для Windows x64. Это preview, а не заявление о завершённом 3D-движке или полном паритете со старой игрой.
+> **Текущая версия:** v2.0.0-preview.4 — предварительная сборка для Windows x64. Это preview, а не заявление о завершённом 3D-движке или полном паритете со старой игрой.
 
 ## Скачать и запустить
 
-1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.3) и скачайте архив PixelEngine-v2.0.0-preview.3-win-x64.zip.
+1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.4) и скачайте архив PixelEngine-v2.0.0-preview.4-win-x64.zip.
 2. Распакуйте архив целиком в отдельную папку. Не удаляйте каталог Lic: в нём лежат демонстрационные проекты.
 3. Запустите PixelEngine.Editor.exe. При первом старте редактор автоматически откроет Lic/demo.lic.
 4. Нажмите **F5**, чтобы запустить игру в отдельном окне. **Shift+F5** останавливает Player. Полная версия статического сайта проекта также включена в архив в каталоге `Website/`.
 
-Релизный архив содержит self-contained сборки .NET 8: устанавливать .NET SDK на компьютере, где запускается готовый пакет, не требуется. Для MonoGame Player нужны Windows x64 и совместимый графический драйвер/OpenGL.
+Релизный архив содержит self-contained сборки .NET 8: устанавливать .NET SDK на компьютере, где запускается готовый пакет, не требуется. Полная папка `Player/` содержит исполняемый файл MonoGame и необходимые ему библиотеки SDL/OpenAL — не перемещайте `PixelEngine.Sandbox.exe` отдельно от этой папки. Для Player нужны Windows x64 и совместимый графический драйвер/OpenGL.
 
 ## Что входит в PixelEngine 2.0
 
