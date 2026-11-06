@@ -110,12 +110,16 @@ jobs:
         shell: pwsh
         run: |
           & .\pack_games.ps1
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if ($LASTEXITCODE -ne 0) { throw "pack_games.ps1 failed with exit code $LASTEXITCODE." }
           $games = @(Get-ChildItem -LiteralPath .\Publish\Games -Directory)
           if ($games.Count -ne 6) { throw "Expected 6 ready-to-run Bloody Pixels games; found $($games.Count)." }
+          if (-not (Test-Path -LiteralPath .\Publish\PlayerSC\PixelPlayer.exe -PathType Leaf)) {
+            throw "Shared self-contained legacy PixelPlayer.exe is missing."
+          }
           foreach ($name in @('DemoGame', 'Ages', 'WorldAges', 'Merchant', 'Tower', 'Knights')) {
-            foreach ($required in @("$name.exe", 'game.lic')) {
-              if (-not (Test-Path -LiteralPath (Join-Path (Join-Path .\Publish\Games $name) $required) -PathType Leaf)) {
+            $gameDirectory = Join-Path .\Publish\Games $name
+            foreach ($required in @('game.lic', "Run-$name.cmd", 'README.txt')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $gameDirectory $required) -PathType Leaf)) {
                 throw "Standalone game $name is missing $required."
               }
             }
