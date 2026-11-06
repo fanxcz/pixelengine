@@ -21,7 +21,10 @@ PLAY — ORIGINAL BLOODY PIXELS
 INCLUDED PROJECTS
 - Lic\ — all built-in LIC samples and showcase projects.
 - Games\Ashfall\ — Ashfall.lic, Lua source, assets, preview and documentation.
-- PixelFight*\ — original Bloody Pixels game/editor/player/Android source and tests.
+- PixelFight*\ — original Bloody Pixels game/editor/player/Android source and tests, with original relative paths preserved.
+- BloodyPixels\Windows\Game\PixelFight.exe — ready-to-run original Windows game.
+- BloodyPixels\Windows\Editor\PixelFightEditor.exe — ready-to-run original editor.
+- BloodyPixels\Windows\Player\PixelPlayer.exe — ready-to-run legacy LIC Player; game.lic opens by default.
 
 PACKAGE
 - PixelEngine.Editor.exe — Windows Studio editor.
@@ -35,7 +38,7 @@ PACKAGE
 
 REQUIREMENTS
 - PixelEngine 2.0 release: Windows 10/11 x64. No .NET SDK required for the self-contained editor/player package.
-- Legacy Windows sources: .NET 8 SDK.
+- Legacy Windows source projects: .NET 8 SDK. Packaged legacy Windows apps are self-contained.
 - Legacy Android source: .NET MAUI Android workload and Android SDK.
 - MonoGame Player: compatible graphics driver/OpenGL.
 
