@@ -142,6 +142,35 @@ jobs:
           }
           Write-Host "Found native SDL runtime: $($sdl.FullName) ($($sdl.Length) bytes)"
 
+      - name: Publish Bloody Pixels legacy Windows applications
+        shell: pwsh
+        run: |
+          $legacyRoot = Join-Path $env:RUNNER_TEMP 'pixelengine\legacy'
+          $legacyGame = Join-Path $legacyRoot 'game'
+          $legacyEditor = Join-Path $legacyRoot 'editor'
+          $legacyPlayer = Join-Path $legacyRoot 'player'
+
+          dotnet publish .\PixelFight\PixelFight.csproj -c Release -r win-x64 --self-contained true --output $legacyGame -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false
+          if ($LASTEXITCODE -ne 0) { throw "Could not publish the original Bloody Pixels game." }
+
+          dotnet publish .\PixelFight.Editor\PixelFight.Editor.csproj -c Release -r win-x64 --self-contained true --output $legacyEditor -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false
+          if ($LASTEXITCODE -ne 0) { throw "Could not publish the original Bloody Pixels editor." }
+
+          dotnet publish .\PixelFight.Player\PixelFight.Player.csproj -c Release -r win-x64 --self-contained true --output $legacyPlayer -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false
+          if ($LASTEXITCODE -ne 0) { throw "Could not publish the original Bloody Pixels Player." }
+
+          $requiredExecutables = @(
+            (Join-Path $legacyGame 'PixelFight.exe'),
+            (Join-Path $legacyEditor 'PixelFightEditor.exe'),
+            (Join-Path $legacyPlayer 'PixelPlayer.exe')
+          )
+          foreach ($executable in $requiredExecutables) {
+            if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+              throw "Legacy Windows executable missing after publish: $executable"
+            }
+          }
+          Write-Host "Published the original Bloody Pixels Game, Editor and Player for Windows x64."
+
       - name: Assemble release ZIP and SHA-256
         id: package
         shell: pwsh
@@ -150,6 +179,7 @@ jobs:
           $editorDir = Join-Path $env:RUNNER_TEMP 'pixelengine\editor'
           $playerDir = Join-Path $env:RUNNER_TEMP 'pixelengine\player'
           $playerPackageDir = Join-Path $env:RUNNER_TEMP 'pixelengine\package\Player'
+          $legacyPublishRoot = Join-Path $env:RUNNER_TEMP 'pixelengine\legacy'
           $packageDir = Join-Path $env:RUNNER_TEMP 'pixelengine\package'
           New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
 
@@ -209,6 +239,23 @@ jobs:
             Copy-Item -LiteralPath $legacyDirectory -Destination $packageDir -Recurse -Force
           }
 
+          $legacyWindowsPackage = Join-Path $packageDir 'BloodyPixels\Windows'
+          foreach ($app in @(
+            @{ Name = 'Game'; Source = (Join-Path $legacyPublishRoot 'game'); Executable = 'PixelFight.exe' },
+            @{ Name = 'Editor'; Source = (Join-Path $legacyPublishRoot 'editor'); Executable = 'PixelFightEditor.exe' },
+            @{ Name = 'Player'; Source = (Join-Path $legacyPublishRoot 'player'); Executable = 'PixelPlayer.exe' }
+          )) {
+            $destination = Join-Path $legacyWindowsPackage $app.Name
+            New-Item -ItemType Directory -Path $destination -Force | Out-Null
+            Get-ChildItem -LiteralPath $app.Source -Force | Copy-Item -Destination $destination -Recurse -Force
+            if (-not (Test-Path -LiteralPath (Join-Path $destination $app.Executable) -PathType Leaf)) {
+              throw "Bloody Pixels $($app.Name) executable is missing from the final ZIP."
+            }
+          }
+          # The legacy player opens game.lic beside its executable when no command-line
+          # project is supplied. Bundle a known-good LIC sample for a one-click launch.
+          Copy-Item -LiteralPath (Join-Path (Get-Location).Path 'Lic\world.lic') -Destination (Join-Path $legacyWindowsPackage 'Player\game.lic') -Force
+
           $packagedProjects = @(Get-ChildItem -LiteralPath $packageDir -Filter '*.lic' -File -Recurse)
           if ($packagedProjects.Count -lt 9) {
             throw "The release ZIP must include all built-in LIC projects and Ashfall; found $($packagedProjects.Count)."
@@ -234,7 +281,17 @@ jobs:
               throw "Preserved Bloody Pixels source is missing from the ZIP: $required"
             }
           }
-          Write-Host "Legacy Bloody Pixels source folders and relative project layout are preserved."
+          foreach ($legacyExecutable in @(
+            'BloodyPixels\Windows\Game\PixelFight.exe',
+            'BloodyPixels\Windows\Editor\PixelFightEditor.exe',
+            'BloodyPixels\Windows\Player\PixelPlayer.exe',
+            'BloodyPixels\Windows\Player\game.lic'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path $packageDir $legacyExecutable) -PathType Leaf)) {
+              throw "Bloody Pixels Windows app missing from release ZIP: $legacyExecutable"
+            }
+          }
+          Write-Host "Legacy Bloody Pixels source and all three ready-to-run Windows apps are included."
 
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $version = $env:GITHUB_REF_NAME
