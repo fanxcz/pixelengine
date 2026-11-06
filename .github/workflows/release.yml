@@ -252,6 +252,7 @@ jobs:
           Copy-Item -LiteralPath 'RELEASE-README.txt' -Destination (Join-Path $packageDir 'README.txt')
           Copy-Item -LiteralPath 'RELEASE-NOTES-v2.0.0-preview.6.md' -Destination (Join-Path $packageDir 'RELEASE-NOTES.md')
           Copy-Item -LiteralPath 'BLOODY-PIXELS-LEGACY.md' -Destination (Join-Path $packageDir 'BLOODY-PIXELS-LEGACY.md')
+          Copy-Item -LiteralPath 'pack_games.ps1' -Destination (Join-Path $packageDir 'pack_games.ps1')
           Copy-Item -LiteralPath 'PIXELENGINE_2_MIGRATION.md' -Destination (Join-Path $packageDir 'PIXELENGINE_2_MIGRATION.md')
           Copy-Item -LiteralPath 'README_PIXELENGINE_2.md' -Destination (Join-Path $packageDir 'README_PIXELENGINE_2.md')
           Copy-Item -LiteralPath 'avatar.png' -Destination (Join-Path $packageDir 'avatar.png')
@@ -263,8 +264,10 @@ jobs:
           if (-not (Test-Path -LiteralPath (Join-Path $packedPlayerSource 'PixelPlayer.exe') -PathType Leaf)) {
             throw "Shared Bloody Pixels Player was not generated: $packedPlayerSource"
           }
-          Copy-Item -LiteralPath $packedGamesSource -Destination (Join-Path $packageDir 'Publish\Games') -Recurse -Force
-          Copy-Item -LiteralPath $packedPlayerSource -Destination (Join-Path $packageDir 'Publish\PlayerSC') -Recurse -Force
+          $publishPackageRoot = Join-Path $packageDir 'Publish'
+          New-Item -ItemType Directory -Path $publishPackageRoot -Force | Out-Null
+          Copy-Item -LiteralPath $packedGamesSource -Destination (Join-Path $publishPackageRoot 'Games') -Recurse -Force
+          Copy-Item -LiteralPath $packedPlayerSource -Destination (Join-Path $publishPackageRoot 'PlayerSC') -Recurse -Force
           foreach ($legacyDirectory in @('PixelFight', 'PixelFight.Editor', 'PixelFight.Player', 'PixelFight.Droid', 'PixelFight.Tests')) {
             Copy-Item -LiteralPath $legacyDirectory -Destination $packageDir -Recurse -Force
           }
