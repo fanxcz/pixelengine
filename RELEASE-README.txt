@@ -1,4 +1,4 @@
-PIXELENGINE 2.0.0-PREVIEW.2 — WINDOWS X64
+PIXELENGINE 2.0.0-PREVIEW.3 — WINDOWS X64
 
 INSTALL
 1. Extract the entire ZIP archive into its own folder.
@@ -16,6 +16,7 @@ PACKAGE
 - Lic\ — sample projects and LIC fixtures.
 - Website\ — complete static site (HTML, CSS, favicon, sitemap and robots.txt).
 - README.md — project overview, source-build instructions and current limitations.
+- LICENSE — MIT license for the project.
 - RELEASE-NOTES.md — changes and known limitations for this preview.
 
 REQUIREMENTS
@@ -28,7 +29,8 @@ NOTES
 - The current runtime is 2D. The 3D workspace is not implemented.
 - Lua scripts run through MoonSharp SoftSandbox.
 - C# scripts are retained as editable source and are not executed by the current Player.
+- Source code is MIT-licensed; third-party dependencies and assets may retain separate terms.
 - Startup logs: %LOCALAPPDATA%\PixelEngine\Logs\
 
 Official repository: https://github.com/fanxcz/pixelengine
-Release: https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.2
+Release: https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.3
