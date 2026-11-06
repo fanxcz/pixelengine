@@ -25,13 +25,16 @@ INCLUDED PROJECTS
 - BloodyPixels\Windows\Game\PixelFight.exe — ready-to-run original Windows game.
 - BloodyPixels\Windows\Editor\PixelFightEditor.exe — ready-to-run original editor.
 - BloodyPixels\Windows\Player\PixelPlayer.exe — ready-to-run legacy LIC Player; game.lic opens by default.
+- Publish\Games\ — six legacy game folders (DemoGame, Ages, WorldAges, Merchant, Tower, Knights), each with game.lic and a Run-*.cmd launcher.
+- Publish\PlayerSC\PixelPlayer.exe — one shared self-contained runtime used by all six game launchers.
 
 PACKAGE
 - PixelEngine.Editor.exe — Windows Studio editor.
 - Player\PixelEngine.Sandbox.exe — self-contained MonoGame Player.
 - Player\ — complete .NET publish output, including SDL2.dll and native runtime dependencies.
 - Lic\ and Games\ — sample projects and complete game sources/assets.
-- PixelFight\, PixelFight.Editor\, PixelFight.Player\, PixelFight.Droid\, PixelFight.Tests\ — preserved legacy source trees. The folder layout is intentional because project references are relative.
+- Publish\ — six standalone legacy game launchers and one shared self-contained legacy Player.
+- PixelFight\, PixelFight.Editor\, PixelFight.Player\, PixelFight.Droid\, PixelFight.Tests\ — preserved legacy source trees. The folder layout is intentional because project references are relative. The six Publish\Games launchers share Publish\PlayerSC\PixelPlayer.exe to avoid duplicating the runtime.
 - Website\ — static project website (HTML, CSS, favicon, sitemap and robots.txt).
 - README.md, BLOODY-PIXELS-LEGACY.md, LICENSE and RELEASE-NOTES.md.
 - SHA-256 checksum beside the ZIP.
