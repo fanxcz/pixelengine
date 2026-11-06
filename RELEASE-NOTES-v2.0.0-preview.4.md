@@ -37,4 +37,4 @@ The CI checks confirm the code and package structure; they do not replace a real
 - The terminal is not a full VT100/ANSI implementation.
 - Third-party libraries and assets may have separate license terms; review their notices before redistribution.
 
-This is a preview release intended for testing and feedback.
+This preview includes fixes for the reported MonoGame SDL startup failure and script-editor freezing/scroll jumps on larger Lua files. It is intended for testing and feedback; verify the Player launch on the target Windows machine.
