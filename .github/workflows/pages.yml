@@ -15,7 +15,8 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # Let the active deployment finish; canceling it can leave Pages in updating_pages.
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -73,3 +74,23 @@ jobs:
       - name: Deploy website
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 900000
+
+      - name: Verify public website
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            status=$(curl --silent --show-error --location --output /tmp/pixelengine-page.html --write-out '%{http_code}' "$PAGE_URL")
+            if [[ "$status" == "200" ]] && grep -q "PixelEngine — 2D game engine" /tmp/pixelengine-page.html; then
+              echo "Website is live: $PAGE_URL (HTTP $status)"
+              exit 0
+            fi
+            echo "Site not ready yet (attempt $attempt, HTTP $status); retrying..."
+            sleep 5
+          done
+          echo "::error::Deployed site did not return the expected PixelEngine page."
+          exit 1
