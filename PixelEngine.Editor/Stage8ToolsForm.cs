@@ -73,6 +73,7 @@ public sealed class Stage8ToolsForm : Form
         _profilerTimer.Tick += (_, _) => RefreshProfiler();
         _profilerTimer.Start();
         FormClosed += (_, _) => _profilerTimer.Stop();
+        Shown += (_, _) => StudioControlStyler.Style(this);
     }
 
     private void BuildDiagnosticsTab()
