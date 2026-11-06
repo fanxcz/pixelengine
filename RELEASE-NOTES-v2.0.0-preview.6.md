@@ -9,6 +9,7 @@ Windows x64 preview release.
 - Preserves the original relative project references by keeping the legacy folders at the archive root rather than nesting or renaming them.
 - Publishes ready-to-run self-contained Windows x64 builds of the original Bloody Pixels game, editor and Player into `BloodyPixels/Windows/`.
 - Repairs the legacy game packaging script: it now uses repository-relative paths rather than a hard-coded developer path, creates six game-specific `.cmd` launchers and shares one self-contained Player instead of duplicating the .NET runtime six times.
+- Fixes the legacy editor publish conflict: its own `avatar.png` and `world.lic` are copied once, while the referenced game project suppresses only duplicate transitive content. The editor keeps the required local assets and publishes without `NETSDK1152`.
 - Adds a legacy guide describing how to run the original Windows game, editor, old Player, Android source and test runner.
 - CI now restores and builds the legacy Windows projects and runs the Bloody Pixels regression suite in addition to PixelEngine 2.0 tests.
 - Continues to include all `Lic/` samples and the full `Games/Ashfall/` project with Lua source and assets.
