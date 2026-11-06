@@ -39,6 +39,14 @@ jobs:
         run: |
           dotnet restore .\PixelEngine.sln
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::dotnet restore failed"; exit 1 }
+          dotnet restore .\PixelFight\PixelFight.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet restore .\PixelFight.Editor\PixelFight.Editor.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet restore .\PixelFight.Player\PixelFight.Player.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet restore .\PixelFight.Tests\PixelFight.Tests.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Build Debug
         id: build-debug
@@ -85,6 +93,27 @@ jobs:
           $failures = $log -split "`r?`n" | Where-Object { $_ -match '^\s*-\s' -or $_ -match '^FAIL' } | Select-Object -Unique
           foreach ($line in ($failures | Select-Object -First 60)) { Write-Host "::error::$line" }
           if ($code -ne 0) { Write-Host "::error::Editor tests exited with code $code"; exit 1 }
+
+      - name: Build legacy Bloody Pixels projects
+        shell: pwsh
+        run: |
+          dotnet build .\PixelFight\PixelFight.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet build .\PixelFight.Editor\PixelFight.Editor.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet build .\PixelFight.Player\PixelFight.Player.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet build .\PixelFight.Tests\PixelFight.Tests.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Bloody Pixels regression tests
+        shell: pwsh
+        run: |
+          $log = (& dotnet run --project .\PixelFight.Tests\PixelFight.Tests.csproj -c Release --no-build 2>&1 | Out-String)
+          $code = $LASTEXITCODE
+          Write-Host $log
+          if ($code -ne 0) { Write-Host "::error::Bloody Pixels tests exited with code $code"; exit 1 }
+          if ($log -notmatch 'PASS') { Write-Host "::error::Legacy test runner produced no PASS marker"; exit 1 }
 
       - name: Smoke tests (Debug)
         shell: pwsh
