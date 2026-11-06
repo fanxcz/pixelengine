@@ -117,6 +117,21 @@ jobs:
           dotnet build .\PixelFight.Tests\PixelFight.Tests.csproj -c Release --no-restore
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Package Bloody Pixels standalone games
+        shell: pwsh
+        run: |
+          & .\pack_games.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Bloody Pixels game packaging failed." }
+          $games = @(Get-ChildItem -LiteralPath .\Publish\Games -Directory)
+          if ($games.Count -ne 6) { throw "Expected 6 ready-to-run Bloody Pixels games; found $($games.Count)." }
+          foreach ($name in @('DemoGame', 'Ages', 'WorldAges', 'Merchant', 'Tower', 'Knights')) {
+            foreach ($required in @("$name.exe", 'game.lic')) {
+              if (-not (Test-Path -LiteralPath (Join-Path (Join-Path .\Publish\Games $name) $required) -PathType Leaf)) {
+                throw "Standalone game $name is missing $required."
+              }
+            }
+          }
+
       - name: Bloody Pixels legacy regression tests
         shell: pwsh
         run: |
@@ -203,7 +218,8 @@ jobs:
             'PixelFight.Player\PixelFight.Player.csproj',
             'PixelFight.Droid\PixelFight.Droid.csproj',
             'PixelFight.Tests\PixelFight.Tests.csproj',
-            'PixelFight.Tests\TestMain.cs'
+            'PixelFight.Tests\TestMain.cs',
+            'pack_games.ps1'
           )
           $legacyFiles = @($legacyRequired | ForEach-Object { Join-Path (Get-Location).Path $_ })
           foreach ($required in @($editorExe, $playerExe, $demoFile, $siteIndex, $siteStyles, $licenseFile, $ashfallProject, $ashfallLua) + $legacyFiles) {
@@ -235,6 +251,11 @@ jobs:
           Copy-Item -LiteralPath 'PIXELENGINE_2_MIGRATION.md' -Destination (Join-Path $packageDir 'PIXELENGINE_2_MIGRATION.md')
           Copy-Item -LiteralPath 'README_PIXELENGINE_2.md' -Destination (Join-Path $packageDir 'README_PIXELENGINE_2.md')
           Copy-Item -LiteralPath 'avatar.png' -Destination (Join-Path $packageDir 'avatar.png')
+          $packedGamesSource = Join-Path (Get-Location).Path 'Publish\Games'
+          if (-not (Test-Path -LiteralPath $packedGamesSource -PathType Container)) {
+            throw "Standalone Bloody Pixels games were not generated: $packedGamesSource"
+          }
+          Copy-Item -LiteralPath $packedGamesSource -Destination (Join-Path $packageDir 'Publish\Games') -Recurse -Force
           foreach ($legacyDirectory in @('PixelFight', 'PixelFight.Editor', 'PixelFight.Player', 'PixelFight.Droid', 'PixelFight.Tests')) {
             Copy-Item -LiteralPath $legacyDirectory -Destination $packageDir -Recurse -Force
           }
@@ -292,6 +313,18 @@ jobs:
             }
           }
           Write-Host "Legacy Bloody Pixels source and all three ready-to-run Windows apps are included."
+          $packagedStandaloneGames = @(Get-ChildItem -LiteralPath (Join-Path $packageDir 'Publish\Games') -Directory)
+          if ($packagedStandaloneGames.Count -ne 6) {
+            throw "Expected six standalone Bloody Pixels game packages in the final ZIP; found $($packagedStandaloneGames.Count)."
+          }
+          foreach ($name in @('DemoGame', 'Ages', 'WorldAges', 'Merchant', 'Tower', 'Knights')) {
+            foreach ($required in @("$name.exe", 'game.lic', 'README.txt')) {
+              if (-not (Test-Path -LiteralPath (Join-Path (Join-Path (Join-Path $packageDir 'Publish\Games') $name) $required) -PathType Leaf)) {
+                throw "Standalone game $name is incomplete in the final ZIP (missing $required)."
+              }
+            }
+          }
+          Write-Host "Verified all six ready-to-run original games in Publish/Games."
 
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $version = $env:GITHUB_REF_NAME
