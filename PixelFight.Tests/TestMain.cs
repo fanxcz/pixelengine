@@ -11,6 +11,10 @@ static class TestMain
     [STAThread]
     static int Main()
     {
+        // The regression runner writes preview screenshots; CI checkouts do not contain
+        // generated output folders, so create the destination before the first render.
+        System.IO.Directory.CreateDirectory("Shots");
+
         // Дымовой тест общего движка: .lic-проект, Lua- и C#-скрипты, спавн, физика, рендер.
         try
         {
