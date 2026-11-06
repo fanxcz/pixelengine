@@ -1,6 +1,6 @@
 # PixelEngine 2.0
 
-**PixelEngine** — открытый 2D-движок с Windows Studio, отдельным MonoGame Player и проектами в формате `.lic`. В репозитории находятся исходники движка, редактор, игровые примеры и тесты.
+**PixelEngine** — открытый 2D-движок с Windows Studio, отдельным MonoGame Player и проектами в формате `.lic`. В репозитории также сохранены исходные проекты **Bloody Pixels**: старая игра, Windows-редактор, Player, Android MAUI-порт и регрессионные тесты.
 
 [Сайт](https://fanxcz.github.io/pixelengine/) · [Релизы](https://github.com/fanxcz/pixelengine/releases) · [Исходный код](https://github.com/fanxcz/pixelengine) · [MIT License](LICENSE)
 
@@ -9,7 +9,7 @@
 ## Скачать и запустить
 
 1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases) и скачайте `PixelEngine-v2.0.0-preview.5-win-x64.zip`.
-2. Распакуйте архив целиком в отдельную папку. Не удаляйте `Lic/`, `Games/` или `Player/`.
+2. Распакуйте архив целиком в отдельную папку. Не удаляйте `Lic/`, `Games/`, `Player/`, `PixelFight*/` или корневой `avatar.png`. Последние файлы относятся к исходной версии Bloody Pixels.
 3. Запустите `PixelEngine.Editor.exe`. По умолчанию откроется `Lic/demo.lic`.
 4. Нажмите **F5**, чтобы запустить Player в отдельном окне; **Shift+F5** останавливает его.
 
@@ -32,6 +32,12 @@
 | `Games/Ashfall/Ashfall.lic` | ASHFALL: The Last Beacon — top-down arena survival |
 
 У Ashfall также сохранены `Game/game.lua`, каталог `Assets/`, `Preview.png`, README и запись о валидации. Откройте `Games/Ashfall/Ashfall.lic` через **File → Open** в Studio. Управление и описание игры находятся в [`Games/Ashfall/README.md`](Games/Ashfall/README.md).
+
+### Bloody Pixels — оригинальная игра
+
+Старые проекты не удалены и поставляются в архиве в исходной структуре: `PixelFight/`, `PixelFight.Editor/`, `PixelFight.Player/`, `PixelFight.Droid/`, `PixelFight.Tests/` и `avatar.png`. Windows-проекты требуют .NET 8 SDK; Android-порт требует MAUI workload. Полные инструкции находятся в [`BLOODY-PIXELS-LEGACY.md`](BLOODY-PIXELS-LEGACY.md).
+
+Важно: это сохранённая оригинальная версия игры, а не полностью перенесённая в PixelEngine 2.0 игра. Новый MonoGame runtime пока не имеет полного паритета по игровой логике, физике и визуализации Bloody Pixels.
 
 ## Возможности Studio
 
@@ -73,6 +79,10 @@ dotnet run --project .\PixelEngine.Editor\PixelEngine.Editor.csproj -c Debug
 
 # Ashfall Player
 dotnet run --project .\PixelEngine.Sandbox\PixelEngine.Sandbox.csproj -c Debug -- ".\Games\Ashfall\Ashfall.lic"
+
+# Original Bloody Pixels game and legacy tests (Windows)
+dotnet run --project .\PixelFight\PixelFight.csproj -c Release
+dotnet run --project .\PixelFight.Tests\PixelFight.Tests.csproj -c Release
 ```
 
 Или откройте `PixelEngine.sln` в Visual Studio 2022 с поддержкой .NET 8.
@@ -88,7 +98,9 @@ dotnet run --project .\PixelEngine.Sandbox\PixelEngine.Sandbox.csproj -c Debug -
 | `PixelEngine.Editor.Tests/` | Headless проверки логики редактора |
 | `Lic/` | LIC-примеры и тестовые проекты |
 | `Games/` | Игры с исходниками и ресурсами, включая Ashfall |
-| `PixelFight*` | Исходники предыдущего PixelFight-приложения |
+| `PixelFight/`, `PixelFight.Editor/`, `PixelFight.Player/` | Оригинальная Bloody Pixels игра, редактор и Player |
+| `PixelFight.Droid/`, `PixelFight.Tests/` | Android MAUI-порт и регрессионные тесты legacy-версии |
+| `avatar.png` | Общий арт исходных проектов Bloody Pixels |
 | `docs/` | Статический сайт |
 | `.github/workflows/` | CI, релизная сборка и публикация Pages |
 
