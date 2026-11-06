@@ -15,7 +15,7 @@ internal static class Program
         "PixelEngine", "Logs", "player-startup.log");
 
     [STAThread]
-    private static void Main(string[] args)
+    private static int Main(string[] args)
     {
         try
         {
@@ -25,6 +25,7 @@ internal static class Program
             using var game = new LicPreviewGame(projectPath);
             game.Run();
             WritePlayerLog("Game window closed normally.");
+            return 0;
         }
         catch (Exception ex)
         {
@@ -35,6 +36,9 @@ internal static class Program
                 NativeMessageBox(IntPtr.Zero, message, "PixelEngine Player error", 0x10 | 0x0);
             else
                 Console.Error.WriteLine(message + Environment.NewLine + ex);
+            // A failed startup must be visible to Studio's process monitor. Main previously
+            // swallowed the exception and returned exit code 0, hiding the actual failure.
+            return 1;
         }
     }
 
