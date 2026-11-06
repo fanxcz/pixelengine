@@ -38,10 +38,15 @@ internal static class EditorLaunchPaths
             ? new[] { "PixelEngine.Sandbox.exe", "PixelEngine.Sandbox" }
             : new[] { "PixelEngine.Sandbox", "PixelEngine.Sandbox.exe" };
 
+        // Current releases keep the complete, non-single-file MonoGame publish output in
+        // Player/. Older preview archives placed a single-file executable beside Studio.
         foreach (var name in names)
         {
-            var candidate = Path.Combine(applicationDirectory, name);
-            if (File.Exists(candidate)) return candidate;
+            var legacyCandidate = Path.Combine(applicationDirectory, name);
+            if (File.Exists(legacyCandidate)) return legacyCandidate;
+
+            var packagedCandidate = Path.Combine(applicationDirectory, "Player", name);
+            if (File.Exists(packagedCandidate)) return packagedCandidate;
         }
 
         return null;
