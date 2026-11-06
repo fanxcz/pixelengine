@@ -106,6 +106,21 @@ jobs:
           dotnet build .\PixelFight.Tests\PixelFight.Tests.csproj -c Release --no-restore
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Package Bloody Pixels standalone games
+        shell: pwsh
+        run: |
+          & .\pack_games.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $games = @(Get-ChildItem -LiteralPath .\Publish\Games -Directory)
+          if ($games.Count -ne 6) { throw "Expected 6 ready-to-run Bloody Pixels games; found $($games.Count)." }
+          foreach ($name in @('DemoGame', 'Ages', 'WorldAges', 'Merchant', 'Tower', 'Knights')) {
+            foreach ($required in @("$name.exe", 'game.lic')) {
+              if (-not (Test-Path -LiteralPath (Join-Path (Join-Path .\Publish\Games $name) $required) -PathType Leaf)) {
+                throw "Standalone game $name is missing $required."
+              }
+            }
+          }
+
       - name: Bloody Pixels regression tests
         shell: pwsh
         run: |
