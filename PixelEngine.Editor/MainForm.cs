@@ -110,8 +110,8 @@ public sealed class MainForm : Form
         // known, so the dock layout keeps its proportion on 125%–250% displays instead of
         // collapsing the viewport. The minimum is the point where every dock still fits.
         Theme.TrackDpi(this);
-        MinimumSize = new Size(Theme.Px(1000), Theme.Px(620));
-        Size = new Size(Theme.Px(1580), Theme.Px(980));
+        MinimumSize = new Size(Theme.Px(900), Theme.Px(600));
+        Size = new Size(Theme.Px(1440), Theme.Px(900));
         StartPosition = FormStartPosition.CenterScreen;
         // Preferences are loaded before the shell so toolbars, the terminal and the scene view
         // start with the user's saved state instead of being patched afterwards.
@@ -191,9 +191,9 @@ public sealed class MainForm : Form
 
         // Dock layout: Scene + FileSystem on the left, viewport in the center,
         // Inspector/Node/Signals on the right and Output/Problems/Terminal below.
-        ConfigureSplit(_rootSplit, Orientation.Horizontal, new Size(1500, 760), 555, 420, 145);
-        ConfigureSplit(_sideSplit, Orientation.Vertical, new Size(1500, 555), 285, 200, 440);
-        ConfigureSplit(_centerSplit, Orientation.Vertical, new Size(1210, 555), 900, 420, 240);
+        ConfigureSplit(_rootSplit, Orientation.Horizontal, new Size(1440, 700), 505, 300, 100);
+        ConfigureSplit(_sideSplit, Orientation.Vertical, new Size(1440, 505), 270, 170, 320);
+        ConfigureSplit(_centerSplit, Orientation.Vertical, new Size(1170, 505), 850, 420, 220);
 
         _sideSplit.Panel1.Controls.Add(explorerPanel);
         _sideSplit.Panel2.Controls.Add(_centerSplit);
@@ -272,8 +272,8 @@ public sealed class MainForm : Form
             var width = ClientSize.Width;
             var height = ClientSize.Height;
             if (width <= 0 || height <= 0) return;
-            var compact = width < Theme.Px(1240);
-            var narrow = width < Theme.Px(1080);
+            var compact = width < Theme.Px(1180);
+            var narrow = width < Theme.Px(960);
             if (compact && !_centerSplit.Panel2Collapsed && _autoCollapsedInspector is false)
             {
                 _autoCollapsedInspector = true;
@@ -294,12 +294,12 @@ public sealed class MainForm : Form
                 _autoCollapsedExplorer = false;
                 _sideSplit.Panel1Collapsed = false;
             }
-            if (height < Theme.Px(640) && !_rootSplit.Panel2Collapsed && !_autoCollapsedBottom)
+            if (height < Theme.Px(600) && !_rootSplit.Panel2Collapsed && !_autoCollapsedBottom)
             {
                 _autoCollapsedBottom = true;
                 _rootSplit.Panel2Collapsed = true;
             }
-            else if (height >= Theme.Px(700) && _autoCollapsedBottom)
+            else if (height >= Theme.Px(660) && _autoCollapsedBottom)
             {
                 _autoCollapsedBottom = false;
                 _rootSplit.Panel2Collapsed = false;
@@ -679,10 +679,10 @@ public sealed class MainForm : Form
     /// </summary>
     private void ClampSplitDistances()
     {
-        ClampSplit(_rootSplit, horizontal: false, minimumPanel1: Theme.Px(220), minimumPanel2: Theme.Px(120));
-        ClampSplit(_sideSplit, horizontal: true, minimumPanel1: Theme.Px(180), minimumPanel2: Theme.Px(260));
-        ClampSplit(_centerSplit, horizontal: true, minimumPanel1: Theme.Px(320), minimumPanel2: Theme.Px(220));
-        ClampSplit(_leftDockSplit, horizontal: false, minimumPanel1: Theme.Px(120), minimumPanel2: Theme.Px(140));
+        ClampSplit(_rootSplit, horizontal: false, minimumPanel1: Theme.Px(300), minimumPanel2: Theme.Px(100));
+        ClampSplit(_sideSplit, horizontal: true, minimumPanel1: Theme.Px(170), minimumPanel2: Theme.Px(240));
+        ClampSplit(_centerSplit, horizontal: true, minimumPanel1: Theme.Px(320), minimumPanel2: Theme.Px(210));
+        ClampSplit(_leftDockSplit, horizontal: false, minimumPanel1: Theme.Px(110), minimumPanel2: Theme.Px(130));
     }
 
     private static void ClampSplit(SplitContainer split, bool horizontal, int minimumPanel1, int minimumPanel2)
