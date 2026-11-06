@@ -19,7 +19,7 @@ internal static class Program
     {
         try
         {
-            WritePlayerLog("Starting MonoGame player.");
+            WritePlayerLog($"Starting MonoGame player ({RuntimeInformation.ProcessArchitecture}); base directory: {AppContext.BaseDirectory}");
             var projectPath = ResolveProjectPath(args);
             WritePlayerLog($"Project: {projectPath}");
             using var game = new LicPreviewGame(projectPath);
@@ -29,7 +29,8 @@ internal static class Program
         catch (Exception ex)
         {
             WritePlayerLog("Player startup/runtime failure:", ex);
-            var message = $"The game could not start.\n\n{ex.Message}\n\nFull details were saved to:\n{PlayerLogPath}";
+            var rootCause = ex.GetBaseException();
+            var message = $"The game could not start.\n\n{rootCause.Message}\n\nFull details were saved to:\n{PlayerLogPath}";
             if (OperatingSystem.IsWindows())
                 NativeMessageBox(IntPtr.Zero, message, "PixelEngine Player error", 0x10 | 0x0);
             else
