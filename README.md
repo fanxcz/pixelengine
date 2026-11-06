@@ -35,7 +35,7 @@
 
 ### Bloody Pixels — оригинальная игра
 
-Старые проекты не удалены и поставляются в архиве в исходной структуре: `PixelFight/`, `PixelFight.Editor/`, `PixelFight.Player/`, `PixelFight.Droid/`, `PixelFight.Tests/` и `avatar.png`. Windows-проекты требуют .NET 8 SDK; Android-порт требует MAUI workload. Полные инструкции находятся в [`BLOODY-PIXELS-LEGACY.md`](BLOODY-PIXELS-LEGACY.md).
+Старые проекты не удалены: в архив входят исходные каталоги `PixelFight/`, `PixelFight.Editor/`, `PixelFight.Player/`, `PixelFight.Droid/`, `PixelFight.Tests/` и `avatar.png`, а готовые Windows-сборки игры, редактора и Player находятся в `BloodyPixels/Windows/{Game,Editor,Player}/`. Android MAUI-порт поставляется как исходный проект и требует MAUI workload. Полные инструкции — в [`BLOODY-PIXELS-LEGACY.md`](BLOODY-PIXELS-LEGACY.md).
 
 Важно: это сохранённая оригинальная версия игры, а не полностью перенесённая в PixelEngine 2.0 игра. Новый MonoGame runtime пока не имеет полного паритета по игровой логике, физике и визуализации Bloody Pixels.
 
