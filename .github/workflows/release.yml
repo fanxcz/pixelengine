@@ -42,9 +42,19 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore solution
+      - name: Restore solution and legacy projects
         shell: pwsh
-        run: dotnet restore .\PixelEngine.sln
+        run: |
+          dotnet restore .\PixelEngine.sln
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet restore .\PixelFight\PixelFight.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet restore .\PixelFight.Editor\PixelFight.Editor.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet restore .\PixelFight.Player\PixelFight.Player.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet restore .\PixelFight.Tests\PixelFight.Tests.csproj
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Validate website and bundled game sources
         shell: pwsh
@@ -95,6 +105,27 @@ jobs:
         shell: pwsh
         run: dotnet run --project .\PixelEngine.Editor.Tests\PixelEngine.Editor.Tests.csproj -c Release --no-build
 
+      - name: Build Bloody Pixels legacy Windows projects
+        shell: pwsh
+        run: |
+          dotnet build .\PixelFight\PixelFight.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet build .\PixelFight.Editor\PixelFight.Editor.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet build .\PixelFight.Player\PixelFight.Player.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          dotnet build .\PixelFight.Tests\PixelFight.Tests.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Bloody Pixels legacy regression tests
+        shell: pwsh
+        run: |
+          $log = (& dotnet run --project .\PixelFight.Tests\PixelFight.Tests.csproj -c Release --no-build 2>&1 | Out-String)
+          $code = $LASTEXITCODE
+          Write-Host $log
+          if ($code -ne 0) { Write-Host "::error::Bloody Pixels tests exited with code $code"; exit 1 }
+          if ($log -notmatch 'PASS') { Write-Host "::error::Legacy test runner produced no PASS marker"; exit 1 }
+
       - name: Publish self-contained Studio
         shell: pwsh
         run: |
@@ -132,7 +163,20 @@ jobs:
           $gamesDir = Join-Path (Get-Location).Path 'Games'
           $ashfallProject = Join-Path $gamesDir 'Ashfall\Ashfall.lic'
           $ashfallLua = Join-Path $gamesDir 'Ashfall\Game\game.lua'
-          foreach ($required in @($editorExe, $playerExe, $demoFile, $siteIndex, $siteStyles, $licenseFile, $ashfallProject, $ashfallLua)) {
+          $legacyRequired = @(
+            'avatar.png',
+            'BLOODY-PIXELS-LEGACY.md',
+            'PIXELENGINE_2_MIGRATION.md',
+            'README_PIXELENGINE_2.md',
+            'PixelFight\PixelFight.csproj',
+            'PixelFight.Editor\PixelFight.Editor.csproj',
+            'PixelFight.Player\PixelFight.Player.csproj',
+            'PixelFight.Droid\PixelFight.Droid.csproj',
+            'PixelFight.Tests\PixelFight.Tests.csproj',
+            'PixelFight.Tests\TestMain.cs'
+          )
+          $legacyFiles = @($legacyRequired | ForEach-Object { Join-Path (Get-Location).Path $_ })
+          foreach ($required in @($editorExe, $playerExe, $demoFile, $siteIndex, $siteStyles, $licenseFile, $ashfallProject, $ashfallLua) + $legacyFiles) {
             if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
               throw "Required release file is missing: $required"
             }
@@ -156,7 +200,14 @@ jobs:
           Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $packageDir 'README.md')
           Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $packageDir 'LICENSE')
           Copy-Item -LiteralPath 'RELEASE-README.txt' -Destination (Join-Path $packageDir 'README.txt')
-          Copy-Item -LiteralPath 'RELEASE-NOTES-v2.0.0-preview.5.md' -Destination (Join-Path $packageDir 'RELEASE-NOTES.md')
+          Copy-Item -LiteralPath 'RELEASE-NOTES-v2.0.0-preview.6.md' -Destination (Join-Path $packageDir 'RELEASE-NOTES.md')
+          Copy-Item -LiteralPath 'BLOODY-PIXELS-LEGACY.md' -Destination (Join-Path $packageDir 'BLOODY-PIXELS-LEGACY.md')
+          Copy-Item -LiteralPath 'PIXELENGINE_2_MIGRATION.md' -Destination (Join-Path $packageDir 'PIXELENGINE_2_MIGRATION.md')
+          Copy-Item -LiteralPath 'README_PIXELENGINE_2.md' -Destination (Join-Path $packageDir 'README_PIXELENGINE_2.md')
+          Copy-Item -LiteralPath 'avatar.png' -Destination (Join-Path $packageDir 'avatar.png')
+          foreach ($legacyDirectory in @('PixelFight', 'PixelFight.Editor', 'PixelFight.Player', 'PixelFight.Droid', 'PixelFight.Tests')) {
+            Copy-Item -LiteralPath $legacyDirectory -Destination $packageDir -Recurse -Force
+          }
 
           $packagedProjects = @(Get-ChildItem -LiteralPath $packageDir -Filter '*.lic' -File -Recurse)
           if ($packagedProjects.Count -lt 9) {
@@ -169,6 +220,21 @@ jobs:
             throw "Ashfall Assets were not copied into the release ZIP."
           }
           Write-Host "Release contains $($packagedProjects.Count) LIC projects plus Ashfall source and assets."
+
+          foreach ($required in @(
+            'avatar.png',
+            'BLOODY-PIXELS-LEGACY.md',
+            'PixelFight\PixelFight.csproj',
+            'PixelFight.Editor\PixelFight.Editor.csproj',
+            'PixelFight.Player\PixelFight.Player.csproj',
+            'PixelFight.Droid\PixelFight.Droid.csproj',
+            'PixelFight.Tests\PixelFight.Tests.csproj'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path $packageDir $required) -PathType Leaf)) {
+              throw "Preserved Bloody Pixels source is missing from the ZIP: $required"
+            }
+          }
+          Write-Host "Legacy Bloody Pixels source folders and relative project layout are preserved."
 
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $version = $env:GITHUB_REF_NAME
@@ -214,7 +280,7 @@ jobs:
           tag_name: ${{ steps.package.outputs.version }}
           target_commitish: ${{ github.sha }}
           name: PixelEngine ${{ steps.package.outputs.version }}
-          body_path: RELEASE-NOTES-v2.0.0-preview.5.md
+          body_path: RELEASE-NOTES-v2.0.0-preview.6.md
           prerelease: ${{ contains(steps.package.outputs.version, '-') }}
           make_latest: ${{ !contains(steps.package.outputs.version, '-') }}
           files: |
