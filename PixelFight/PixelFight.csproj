@@ -9,10 +9,10 @@
     <RootNamespace>PixelFight</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="avatar.png">
+    <Content Include="avatar.png" Condition="'$(PixelFightIncludeContent)' != 'false'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="world.lic">
+    <Content Include="world.lic" Condition="'$(PixelFightIncludeContent)' != 'false'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
