@@ -1,8 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Resolve every path from this script so local runs and GitHub Actions use the
-# same folder layout. The previous script hard-coded C:\Lfall and silently
-# depended on one developer workstation.
+# same folder layout. Never depend on a developer-specific C:\Lfall checkout.
 $repoRoot = (Resolve-Path -LiteralPath $PSScriptRoot).Path
 $publishRoot = Join-Path $repoRoot 'Publish'
 $playerOutput = Join-Path $publishRoot 'PlayerSC'
@@ -23,8 +22,8 @@ Remove-Item -LiteralPath $gamesOutput -Recurse -Force -ErrorAction SilentlyConti
 New-Item -ItemType Directory -Path $playerOutput -Force | Out-Null
 New-Item -ItemType Directory -Path $gamesOutput -Force | Out-Null
 
-Write-Output "Publishing legacy PixelPlayer from $playerProject ..."
-dotnet publish $playerProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $playerOutput --nologo -v q
+Write-Output "Publishing one shared self-contained legacy Player..."
+dotnet publish $playerProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o $playerOutput --nologo -v q
 if ($LASTEXITCODE -ne 0) {
     throw "Legacy Player publish failed with exit code $LASTEXITCODE."
 }
@@ -52,28 +51,24 @@ foreach ($game in $games) {
 
     $destination = Join-Path $gamesOutput $name
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
-
-    # Copy the whole self-contained publish output first, then give the player
-    # a game-specific executable name and place that game's LIC beside it.
-    Get-ChildItem -LiteralPath $playerOutput -File |
-        Where-Object { $_.Extension -notin @('.pdb', '.png') } |
-        Copy-Item -Destination $destination -Force
-
-    $gameExe = Join-Path $destination ($name + '.exe')
-    Copy-Item -LiteralPath $playerExe -Destination $gameExe -Force
-
-    foreach ($extension in @('.runtimeconfig.json', '.deps.json')) {
-        $source = Join-Path $playerOutput ('PixelPlayer' + $extension)
-        if (Test-Path -LiteralPath $source -PathType Leaf) {
-            Copy-Item -LiteralPath $source -Destination (Join-Path $destination ($name + $extension)) -Force
-        }
-    }
-
     Copy-Item -LiteralPath $licFile -Destination (Join-Path $destination 'game.lic') -Force
+
+    # Every small launcher targets the same self-contained Player. This avoids
+    # duplicating the full .NET runtime inside each individual game directory.
+    $launcher = @'
+@echo off
+setlocal
+cd /d "%~dp0"
+"%~dp0..\..\PlayerSC\PixelPlayer.exe" "%~dp0game.lic" %*
+'@
+    Set-Content -LiteralPath (Join-Path $destination ("Run-$name.cmd")) -Value $launcher -Encoding ASCII
+
     $readmeText = @(
         "$name - an original Bloody Pixels game on PixelEngine."
         $game[2]
-        "Double-click $name.exe. Self-contained Windows x64 build; no .NET SDK required. Esc exits."
+        "Run: Run-$name.cmd"
+        "Project: game.lic"
+        "Runtime: shared self-contained Player in ..\..\PlayerSC"
     ) -join [Environment]::NewLine
     [System.IO.File]::WriteAllText(
         (Join-Path $destination 'README.txt'),
@@ -81,8 +76,8 @@ foreach ($game in $games) {
         [System.Text.UTF8Encoding]::new($false)
     )
 
-    if (-not (Test-Path -LiteralPath $gameExe -PathType Leaf) -or
-        -not (Test-Path -LiteralPath (Join-Path $destination 'game.lic') -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $destination 'game.lic') -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $destination "Run-$name.cmd") -PathType Leaf)) {
         throw "Game package is incomplete: $name"
     }
     Write-Output "Packed $name"
@@ -92,4 +87,5 @@ $packedGames = @(Get-ChildItem -LiteralPath $gamesOutput -Directory)
 if ($packedGames.Count -ne $games.Count) {
     throw "Expected $($games.Count) game packages, created $($packedGames.Count)."
 }
-Write-Output "Created $($packedGames.Count) self-contained game packages in $gamesOutput"
+Write-Output "Created $($packedGames.Count) game packages in $gamesOutput"
+Write-Output "Shared legacy Player: $playerExe"
