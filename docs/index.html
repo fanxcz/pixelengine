@@ -3,120 +3,142 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b0e14">
-  <meta name="description" content="PixelEngine 2.0 — 2D game engine, Windows Studio editor and MonoGame player for LIC projects.">
+  <meta name="theme-color" content="#111310">
+  <meta name="description" content="PixelEngine — открытый 2D-движок, редактор Studio для Windows, отдельный Player и примеры игр.">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="PixelEngine 2.0 — создавай 2D-игры">
-  <meta property="og:description" content="2D-движок, Windows Studio и отдельный MonoGame Player.">
+  <meta property="og:title" content="PixelEngine — 2D game engine">
+  <meta property="og:description" content="Открытый 2D-движок, редактор Studio и примеры проектов.">
   <link rel="canonical" href="https://fanxcz.github.io/pixelengine/">
-  <title>PixelEngine 2.0 — создавай 2D-игры</title>
+  <title>PixelEngine — 2D game engine</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="wrap nav">
-      <a class="brand" href="#" aria-label="PixelEngine home"><span class="brand-mark">P</span><span>PIXEL<span class="brand-muted">ENGINE</span></span></a>
+  <header class="site-header">
+    <div class="container header-row">
+      <a class="wordmark" href="#top" aria-label="PixelEngine — на главную">PixelEngine<span>2.0</span></a>
       <nav aria-label="Основная навигация">
-        <a href="#features">Возможности</a>
-        <a href="#workflow">Быстрый старт</a>
-        <a href="#limits">Статус проекта</a>
+        <a href="#projects">Проекты</a>
+        <a href="#engine">Движок</a>
+        <a href="#start">Запуск</a>
         <a href="https://github.com/fanxcz/pixelengine">GitHub</a>
-        <a href="https://github.com/fanxcz/pixelengine/blob/main/LICENSE">MIT License</a>
       </nav>
-      <a class="nav-download" href="https://github.com/fanxcz/pixelengine/releases/download/v2.0.0-preview.4/PixelEngine-v2.0.0-preview.4-win-x64.zip">Скачать <span aria-hidden="true">↗</span></a>
+      <a class="header-download" href="https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.5">Скачать <span aria-hidden="true">↗</span></a>
     </div>
   </header>
 
-  <main>
-    <section class="hero wrap">
-      <div class="hero-copy">
-        <div class="eyebrow"><span class="pulse"></span> PREVIEW RELEASE · WINDOWS X64</div>
-        <h1>От сцены<br>до <span class="gradient-text">своей игры.</span></h1>
-        <p class="lead">PixelEngine — 2D-движок с настольным Studio-редактором, отдельным игровым Player и проектами в формате <code>.lic</code>.</p>
-        <div class="actions">
-          <a class="button primary" href="https://github.com/fanxcz/pixelengine/releases/download/v2.0.0-preview.4/PixelEngine-v2.0.0-preview.4-win-x64.zip">Скачать PixelEngine <span>↗</span></a>
-          <a class="button secondary" href="https://github.com/fanxcz/pixelengine">Исходный код</a>
+  <main id="top">
+    <section class="intro container">
+      <p class="kicker">OPEN SOURCE · WINDOWS · 2D</p>
+      <h1>Делай игры.<br><span>Разбирай движок.</span></h1>
+      <p class="intro-copy">PixelEngine — 2D-движок с редактором Studio, отдельным игровым Player и проектами в формате <code>.lic</code>. Исходный код открыт по лицензии MIT.</p>
+      <div class="intro-actions">
+        <a class="button button-primary" href="https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.5">Скачать для Windows x64 <span aria-hidden="true">↗</span></a>
+        <a class="text-link" href="https://github.com/fanxcz/pixelengine">Исходный код на GitHub</a>
+      </div>
+      <p class="release-line">Текущая сборка: <strong>v2.0.0-preview.5</strong> <span>·</span> Windows 10/11 x64 <span>·</span> .NET 8 включён в архив</p>
+    </section>
+
+    <section class="facts container" aria-label="Кратко о PixelEngine">
+      <div><span class="fact-value">2D</span><span class="fact-label">сцены и runtime</span></div>
+      <div><span class="fact-value">Lua</span><span class="fact-label">скрипты в Player</span></div>
+      <div><span class="fact-value">.lic</span><span class="fact-label">формат проекта</span></div>
+      <div><span class="fact-value">MIT</span><span class="fact-label">открытая лицензия</span></div>
+    </section>
+
+    <section class="section container" id="projects">
+      <div class="section-heading">
+        <p class="kicker">ПРИМЕРЫ</p>
+        <h2>Проекты в комплекте</h2>
+        <p>Примеры и игровые заготовки хранятся в репозитории. Их можно открыть в Studio, изучать и изменять.</p>
+      </div>
+      <div class="project-list">
+        <a class="project-row" href="https://github.com/fanxcz/pixelengine/tree/main/Lic">
+          <span class="project-name">demo.lic</span><span class="project-description">Стартовый проект и знакомство с редактором</span><span class="project-arrow">↗</span>
+        </a>
+        <a class="project-row" href="https://github.com/fanxcz/pixelengine/blob/main/Lic/knights.lic">
+          <span class="project-name">knights.lic</span><span class="project-description">Игровой пример Knights</span><span class="project-arrow">↗</span>
+        </a>
+        <a class="project-row" href="https://github.com/fanxcz/pixelengine/blob/main/Lic/merchant.lic">
+          <span class="project-name">merchant.lic</span><span class="project-description">Игровой пример Merchant</span><span class="project-arrow">↗</span>
+        </a>
+        <a class="project-row" href="https://github.com/fanxcz/pixelengine/blob/main/Lic/strategy.lic">
+          <span class="project-name">strategy.lic</span><span class="project-description">Стратегический пример</span><span class="project-arrow">↗</span>
+        </a>
+        <a class="project-row" href="https://github.com/fanxcz/pixelengine/blob/main/Lic/tower.lic">
+          <span class="project-name">tower.lic</span><span class="project-description">Пример Tower Defense</span><span class="project-arrow">↗</span>
+        </a>
+        <a class="project-row" href="https://github.com/fanxcz/pixelengine/tree/main/Games/Ashfall">
+          <span class="project-name">ASHFALL: The Last Beacon</span><span class="project-description">Top-down arena survival: Lua, враги, волны и босс</span><span class="project-arrow">↗</span>
+        </a>
+        <a class="project-row" href="https://github.com/fanxcz/pixelengine/tree/main/Lic">
+          <span class="project-name">stage8 / stage10 / world</span><span class="project-description">Showcase-сцены и тестовые проекты</span><span class="project-arrow">↗</span>
+        </a>
+      </div>
+      <p class="section-note">Список файлов и исходные материалы: <a href="https://github.com/fanxcz/pixelengine/tree/main/Lic">Lic/</a> и <a href="https://github.com/fanxcz/pixelengine/tree/main/Games">Games/</a>.</p>
+    </section>
+
+    <section class="section section-alt" id="engine">
+      <div class="container">
+        <div class="section-heading">
+          <p class="kicker">ВОЗМОЖНОСТИ</p>
+          <h2>Редактор и движок</h2>
+          <p>Рабочие инструменты без обещаний функций, которых ещё нет в текущей версии.</p>
         </div>
-        <p class="small-note">Версия <strong>v2.0.0-preview.4</strong> · self-contained .NET 8 · Windows 10/11 x64</p>
-      </div>
-
-      <div class="studio-card" aria-label="Иллюстрация интерфейса PixelEngine Studio">
-        <div class="window-bar"><div class="window-dots"><i></i><i></i><i></i></div><span>PixelEngine Studio <b>· demo.lic</b></span><span class="window-status">● READY</span></div>
-        <div class="studio-body">
-          <aside class="mock-side">
-            <div class="mock-label">SCENE</div>
-            <div class="tree selected">▾ Crystal Valley</div>
-            <div class="tree">　▣ Camera</div>
-            <div class="tree">　▣ Player</div>
-            <div class="tree">　▣ Environment</div>
-            <div class="mock-label file-label">FILESYSTEM</div>
-            <div class="file-row">▸ Assets</div>
-            <div class="file-row">▸ Scenes</div>
-            <div class="file-row">▸ Scripts</div>
-          </aside>
-          <section class="mock-viewport">
-            <div class="viewport-top"><span>SCENE VIEW</span><span>2D　·　100%</span></div>
-            <div class="pixel-scene">
-              <div class="sun"></div><div class="mountain back"></div><div class="mountain front"></div>
-              <div class="ground"></div><div class="hero-sprite"><b></b><i></i><em></em></div>
-              <div class="selection-box"></div>
-              <div class="axis x-axis"></div><div class="axis y-axis"></div>
-            </div>
-            <div class="mock-tabs"><span class="active">demo.lic</span><span>Game</span><span>Script</span></div>
-          </section>
-          <aside class="mock-inspector"><div class="mock-label">INSPECTOR</div><div class="inspect-title">Player</div><div class="inspect-line"></div><div class="mock-label">TRANSFORM</div><div class="field-pair"><span>Position X</span><b>128</b></div><div class="field-pair"><span>Position Y</span><b>240</b></div><div class="mock-label component-label">COMPONENTS</div><div class="component">SpriteRenderer</div><div class="component">Rigidbody2D</div><div class="component">BoxCollider2D</div></aside>
-        </div>
-        <div class="mock-footer"><span>● SCENE SAVED</span><span>FPS — —</span><span>OUTPUT　 PROBLEMS　 TERMINAL</span></div>
-      </div>
-    </section>
-
-    <section class="signal-strip">
-      <div class="wrap signal-grid">
-        <div><strong>2D</strong><span>движок и редактор</span></div>
-        <div><strong>.lic</strong><span>единый формат проекта</span></div>
-        <div><strong>Lua</strong><span>скрипты через MoonSharp</span></div>
-        <div><strong>Windows</strong><span>готовый x64-пакет</span></div>
-      </div>
-    </section>
-
-    <section class="section wrap" id="features">
-      <div class="section-heading"><div class="eyebrow">ИНСТРУМЕНТЫ</div><h2>Всё важное —<br>в одном рабочем пространстве.</h2><p>Редактор помогает собрать сцену, настроить компоненты, подключить ресурсы и запустить отдельное окно игры.</p></div>
-      <div class="feature-grid">
-        <article class="feature-card"><div class="feature-icon purple">▦</div><h3>Studio Editor</h3><p>Тёмная док-панельная компоновка: Scene, Scripts, Prefabs, FileSystem, Inspector, Problems и Terminal. Размеры панелей и настройки сохраняются между запусками.</p><span class="feature-tag">WINFORMS · DPI AWARE</span></article>
-        <article class="feature-card"><div class="feature-icon blue">◇</div><h3>Scene & Components</h3><p>Перемещай объекты в 2D, работай с сеткой, snapping, камерами, физикой и TileMap.</p></article>
-        <article class="feature-card"><div class="feature-icon green">⌘</div><h3>Lua scripting</h3><p>Проверяй Lua-код и запускай его в Player через MoonSharp SoftSandbox.</p></article>
-        <article class="feature-card"><div class="feature-icon orange">▣</div><h3>Assets & Prefabs</h3><p>Импортируй PNG и WAV, управляй ссылками на ресурсы, создавай и обновляй prefab-шаблоны.</p></article>
-        <article class="feature-card"><div class="feature-icon pink">⌁</div><h3>Terminal & Diagnostics</h3><p>PowerShell/CMD, история команд, вывод процессов, диагностика проектов и ошибки сборки в Problems.</p></article>
-      </div>
-    </section>
-
-    <section class="workflow-section" id="workflow">
-      <div class="wrap workflow-grid">
-        <div><div class="eyebrow">ПРОСТОЙ СТАРТ</div><h2>Открой.<br>Измени.<br><span class="gradient-text">Запусти.</span></h2><p>В архив уже включён демонстрационный проект. Не нужно отдельно устанавливать .NET SDK. В Player включены native SDL runtime-файлы.</p><a class="text-link" href="https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.4">Перейти к релизу <span>→</span></a></div>
-        <div class="steps">
-          <div class="step"><span>01</span><div><h3>Распакуй архив</h3><p>Сохрани папку Lic и всю папку Player рядом с редактором. Не выноси PixelEngine.Sandbox.exe из Player: рядом лежат SDL2.dll и остальные runtime-зависимости.</p></div></div>
-          <div class="step"><span>02</span><div><h3>Открой Studio</h3><p>Запусти PixelEngine.Editor.exe. Проект Lic/demo.lic откроется автоматически.</p></div></div>
-          <div class="step"><span>03</span><div><h3>Нажми F5</h3><p>Player запустится в отдельном окне. Shift+F5 остановит игру.</p></div></div>
+        <div class="capability-list">
+          <article><h3>Studio</h3><p>WinForms-редактор с иерархией сцены, инспектором компонентов, файловой системой, вкладками скриптов, поиском, терминалом и диагностикой.</p></article>
+          <article><h3>2D runtime</h3><p>MonoGame, объекты и компоненты, физика, коллизии, камера, TileMap, анимации, частицы, освещение и аудио.</p></article>
+          <article><h3>Lua</h3><p>Lua-скрипты выполняются через MoonSharp SoftSandbox. Скрипты редактируются в Studio и запускаются в отдельном Player.</p></article>
+          <article><h3>Формат и ресурсы</h3><p>Проект хранит сцены, объекты, настройки и встроенные ресурсы в JSON-файле .lic. PNG и WAV можно добавлять в проект.</p></article>
         </div>
       </div>
     </section>
 
-    <section class="section wrap limits" id="limits">
-      <div class="section-heading"><div class="eyebrow">ЧЕСТНО О PREVIEW</div><h2>Что уже есть<br>и что ещё впереди.</h2><p>PixelEngine 2.0 развивается поэтапно. Ниже — важные текущие границы проекта.</p></div>
-      <div class="limits-grid">
-        <div class="limit-item"><span class="status-dot good"></span><div><h3>2D runtime</h3><p>Сцены, компоненты, физика, аудио, Lua и запуск LIC-проектов.</p></div></div>
-        <div class="limit-item"><span class="status-dot good"></span><div><h3>Windows Studio</h3><p>Редактор на WinForms и отдельный MonoGame Player.</p></div></div>
-        <div class="limit-item"><span class="status-dot future"></span><div><h3>3D, debugger и hot reload</h3><p>Не входят в эту preview-версию. 3D workspace сейчас выключен.</p></div></div>
-        <div class="limit-item"><span class="status-dot future"></span><div><h3>C# runtime scripts</h3><p>C#-скрипты хранятся и редактируются, но текущий Player их не исполняет.</p></div></div>
+    <section class="section container" id="start">
+      <div class="section-heading">
+        <p class="kicker">БЫСТРЫЙ СТАРТ</p>
+        <h2>Запуск за три шага</h2>
+      </div>
+      <ol class="steps">
+        <li><span>01</span><div><h3>Скачай и распакуй</h3><p>Распакуй ZIP полностью. Не отделяй папки <code>Lic</code> и <code>Player</code> от редактора.</p></div></li>
+        <li><span>02</span><div><h3>Открой Studio</h3><p>Запусти <code>PixelEngine.Editor.exe</code>. По умолчанию откроется <code>Lic/demo.lic</code>.</p></div></li>
+        <li><span>03</span><div><h3>Запусти игру</h3><p>Нажми <kbd>F5</kbd>. Player откроется в отдельном окне. <kbd>Shift</kbd> + <kbd>F5</kbd> останавливает запуск.</p></div></li>
+      </ol>
+      <p class="section-note">Для запуска готового архива .NET SDK не нужен. Требуется Windows x64 и совместимый графический драйвер с поддержкой OpenGL.</p>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container limits">
+        <div class="section-heading">
+          <p class="kicker">СТАТУС</p>
+          <h2>Текущие ограничения</h2>
+        </div>
+        <ul class="limit-list">
+          <li>Версия preview для Windows x64; редактор использует WinForms.</li>
+          <li>Runtime ориентирован на 2D. Полноценного 3D-редактора пока нет.</li>
+          <li>Lua исполняется в Player; C#-скрипты пока доступны как редактируемый исходный текст, но не запускаются runtime.</li>
+          <li>CI проверяет сборку и headless-тесты. Это не заменяет ручную проверку графики и устройств ввода на целевой машине.</li>
+        </ul>
       </div>
     </section>
 
-    <section class="download-cta">
-      <div class="wrap cta-inner"><div><div class="eyebrow">PIXELENGINE 2.0 · PREVIEW</div><h2>Собери свою<br><span class="gradient-text">2D-игру.</span></h2><p>Скачай Windows x64 архив или посмотри исходный код и этапы разработки.</p></div><div class="cta-actions"><a class="button primary" href="https://github.com/fanxcz/pixelengine/releases/download/v2.0.0-preview.4/PixelEngine-v2.0.0-preview.4-win-x64.zip">Скачать релиз <span>↗</span></a><a class="button secondary" href="https://github.com/fanxcz/pixelengine">Открыть GitHub</a></div></div>
+    <section class="closing container">
+      <p class="kicker">SOURCE CODE · MIT</p>
+      <h2>Изучай. Изменяй.<br>Делай свою версию.</h2>
+      <p>Создай fork, меняй движок под свои задачи и отправляй улучшения через Pull Request. При распространении сохраняй уведомление об авторских правах и текст MIT License.</p>
+      <div class="intro-actions">
+        <a class="button button-primary" href="https://github.com/fanxcz/pixelengine">Открыть репозиторий <span aria-hidden="true">↗</span></a>
+        <a class="text-link" href="https://github.com/fanxcz/pixelengine/blob/main/LICENSE">Текст лицензии MIT</a>
+      </div>
     </section>
   </main>
 
-  <footer class="footer"><div class="wrap footer-inner"><a class="brand" href="#"><span class="brand-mark">P</span><span>PIXEL<span class="brand-muted">ENGINE</span></span></a><span>PixelEngine 2.0 · Preview · <a href="https://github.com/fanxcz/pixelengine">GitHub</a></span><span class="footer-note"><a href="https://github.com/fanxcz/pixelengine/blob/main/LICENSE">MIT License</a></span></div></footer>
+  <footer class="site-footer">
+    <div class="container footer-row">
+      <a class="wordmark" href="#top">PixelEngine<span>2.0</span></a>
+      <span>Открытый 2D-движок · Windows x64</span>
+      <a href="https://github.com/fanxcz/pixelengine">GitHub ↗</a>
+    </div>
+  </footer>
 </body>
 </html>
