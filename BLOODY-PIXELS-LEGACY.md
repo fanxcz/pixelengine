@@ -11,7 +11,9 @@ The repository preserves the original **Bloody Pixels** game alongside PixelEngi
 - `PixelFight.Tests/` — regression runner for the legacy game/runtime.
 - `avatar.png` — shared source artwork used by the original projects.
 
-The directory layout is intentionally preserved at the archive root. The old project files use relative references such as `..\PixelFight\PixelFight.csproj` and `..\avatar.png`; moving the folders into a nested `Legacy/` directory would break those references.
+The source directory layout is intentionally preserved at the archive root. The old project files use relative references such as `..\PixelFight\PixelFight.csproj` and `..\avatar.png`; moving the folders into a nested `Legacy/` directory would break those references.
+
+The preview ZIP also contains self-contained Windows builds in `BloodyPixels/Windows/Game/`, `BloodyPixels/Windows/Editor/` and `BloodyPixels/Windows/Player/`. They run without installing the .NET SDK. The separate source trees remain available for rebuilding and modifying the original projects.
 
 ## Run on Windows
 
@@ -35,4 +37,4 @@ dotnet build .\PixelFight.Droid\PixelFight.Droid.csproj -c Release
 
 PixelEngine 2.0 uses a separate MonoGame runtime and Studio editor. The old Bloody Pixels projects are preserved as the original game/source version; they are not silently converted into the new runtime. The new Player supports the current LIC compatibility subset, and full gameplay/physics/rendering parity with the original Bloody Pixels runtime is still work in progress.
 
-The legacy Windows projects are built and regression-tested by CI. The Android source is packaged but is not built by the Windows release workflow.
+The legacy Windows projects are built and regression-tested by CI, then published as self-contained Windows x64 applications in the release ZIP. The Android source is packaged but is not built by the Windows release workflow.
