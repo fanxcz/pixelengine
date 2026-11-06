@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
@@ -158,7 +159,15 @@ internal sealed class CodeEditorControl : UserControl
             UpdateStatus();
             UpdateOutline();
         };
-        _editor.SelectionChanged += (_, _) => { _gutter.Invalidate(); UpdateStatus(); UpdateBracketMatch(); };
+        _editor.SelectionChanged += (_, _) =>
+        {
+            // Syntax formatting uses temporary native selections for RichEdit. Do not run
+            // caret/status work for each token while that batch is in progress.
+            if (_highlighting) return;
+            _gutter.Invalidate();
+            UpdateStatus();
+            UpdateBracketMatch();
+        };
         _editor.MouseDown += (_, _) => { if (_completionPopup.Visible) _completionPopup.Close(); };
         _editor.LostFocus += (_, _) =>
         {
@@ -1301,7 +1310,9 @@ internal sealed class CodeEditorControl : UserControl
         var (rangeStart, rangeLength) = GetVisibleTextRange(text, firstVisible, lastVisible);
         if (rangeLength <= 0) return;
 
+        var scrollPosition = _editor.GetScrollPosition();
         _highlighting = true;
+        _editor.SuppressScrollEvents = true;
         var selectionStart = _editor.SelectionStart;
         var selectionLength = _editor.SelectionLength;
         var visibleText = text.Substring(rangeStart, rangeLength);
@@ -1322,6 +1333,11 @@ internal sealed class CodeEditorControl : UserControl
         }
         finally
         {
+            // Restoring temporary token selections must not move the user's viewport or
+            // schedule another syntax pass. Otherwise RichEdit can scroll to each token and
+            // create a self-sustaining scroll/highlight loop on larger files.
+            _editor.SetScrollPosition(scrollPosition);
+            _editor.SuppressScrollEvents = false;
             _highlighting = false;
             _gutter.Invalidate();
             UpdateStatus();
@@ -1382,12 +1398,35 @@ internal sealed class CodeEditorControl : UserControl
 
     private sealed class EditorTextBox : RichTextBox
     {
+        private const int EmGetScrollPos = 0x04DD;
+        private const int EmSetScrollPos = 0x04DE;
+
         public event EventHandler? Scrolled;
+        public bool SuppressScrollEvents { get; set; }
+
+        public Point GetScrollPosition()
+        {
+            if (!IsHandleCreated) return Point.Empty;
+            var position = Point.Empty;
+            SendMessage(Handle, EmGetScrollPos, IntPtr.Zero, ref position);
+            return position;
+        }
+
+        public void SetScrollPosition(Point position)
+        {
+            if (!IsHandleCreated) return;
+            SendMessage(Handle, EmSetScrollPos, IntPtr.Zero, ref position);
+        }
+
         protected override void WndProc(ref Message m)
         {
             base.WndProc(ref m);
-            if (m.Msg is 0x0115 or 0x0114 or 0x020A or 0x020E) Scrolled?.Invoke(this, EventArgs.Empty);
+            if (!SuppressScrollEvents && m.Msg is 0x0115 or 0x0114 or 0x020A or 0x020E)
+                Scrolled?.Invoke(this, EventArgs.Empty);
         }
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int message, IntPtr wParam, ref Point lParam);
     }
 
     private sealed class LineNumberGutter : Control
