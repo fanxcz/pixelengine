@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -89,6 +90,7 @@ internal static class StudioControlStyler
             case StudioButton or StudioTabControl or StudioSectionHeader or StudioCard or SplitContainer or CodeEditorControl or EditorTerminalControl:
                 return; // fully owner-drawn
             case Form form:
+                ApplyWindowChrome(form);
                 if (form is not (EditorPromptDialog or EditorCommandPaletteDialog or ScriptReferenceDialog or GoToLineForm))
                 {
                     form.BackColor = form.BackColor == default ? Theme.Window : form.BackColor;
@@ -158,7 +160,13 @@ internal static class StudioControlStyler
                 list.FullRowSelect = true;
                 list.HideSelection = false;
                 list.GridLines = false;
-                list.OwnerDraw = false;
+                list.OwnerDraw = true;
+                list.DrawColumnHeader -= DrawListViewColumnHeader;
+                list.DrawColumnHeader += DrawListViewColumnHeader;
+                list.DrawItem -= DrawListViewItem;
+                list.DrawItem += DrawListViewItem;
+                list.DrawSubItem -= DrawListViewSubItem;
+                list.DrawSubItem += DrawListViewSubItem;
                 ApplyExplorerTheme(list);
                 return;
             case ListBox box:
@@ -204,6 +212,10 @@ internal static class StudioControlStyler
                 combo.ForeColor = Theme.Text;
                 combo.FlatStyle = FlatStyle.Flat;
                 combo.Font = Theme.Body(Theme.FontBody);
+                combo.DrawMode = DrawMode.OwnerDrawFixed;
+                combo.ItemHeight = Math.Max(combo.ItemHeight, Theme.Px(22));
+                combo.DrawItem -= DrawComboBoxItem;
+                combo.DrawItem += DrawComboBoxItem;
                 ApplyExplorerTheme(combo);
                 return;
             case Button button:
@@ -223,13 +235,13 @@ internal static class StudioControlStyler
                 control.Font = Theme.Body(Theme.FontBody);
                 return;
             case Label label:
-                label.ForeColor = label.ForeColor == Theme.Text || label.ForeColor == default ? Theme.Text : label.ForeColor;
+                label.ForeColor = IsReadableOnDarkSurface(label.ForeColor) ? label.ForeColor : Theme.Text;
                 label.BackColor = label.BackColor == default ? Theme.Panel : label.BackColor;
                 return;
             case Panel or UserControl:
                 if (control.BackColor == default || control.BackColor == SystemColors.Control)
                     control.BackColor = Theme.Panel;
-                if (control.ForeColor == default || control.ForeColor == Control.DefaultForeColor)
+                if (!IsReadableOnDarkSurface(control.ForeColor))
                     control.ForeColor = Theme.Text;
                 return;
             case PictureBox picture:
@@ -253,6 +265,15 @@ internal static class StudioControlStyler
                 grid2.ColumnHeadersDefaultCellStyle.BackColor = Theme.Toolbar;
                 grid2.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Muted;
                 grid2.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.Selection;
+                grid2.ColumnHeadersDefaultCellStyle.SelectionForeColor = Theme.TextStrong;
+                grid2.RowHeadersDefaultCellStyle.BackColor = Theme.Toolbar;
+                grid2.RowHeadersDefaultCellStyle.ForeColor = Theme.Muted;
+                grid2.RowHeadersDefaultCellStyle.SelectionBackColor = Theme.Selection;
+                grid2.RowHeadersDefaultCellStyle.SelectionForeColor = Theme.TextStrong;
+                grid2.RowsDefaultCellStyle.BackColor = Theme.Viewport;
+                grid2.RowsDefaultCellStyle.ForeColor = Theme.Text;
+                grid2.AlternatingRowsDefaultCellStyle.BackColor = Theme.Panel;
+                grid2.AlternatingRowsDefaultCellStyle.ForeColor = Theme.Text;
                 grid2.DefaultCellStyle.BackColor = Theme.Viewport;
                 grid2.DefaultCellStyle.ForeColor = Theme.Text;
                 grid2.DefaultCellStyle.SelectionBackColor = Theme.Selection;
@@ -263,6 +284,83 @@ internal static class StudioControlStyler
                 track.BackColor = Theme.Panel;
                 return;
         }
+    }
+
+    private static bool IsReadableOnDarkSurface(Color color)
+    {
+        return !color.IsEmpty &&
+               color != Color.Black &&
+               color != SystemColors.ControlText &&
+               color != SystemColors.WindowText;
+    }
+
+    private static void DrawListViewColumnHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
+    {
+        if (sender is not ListView list) return;
+        using (var background = new SolidBrush(Theme.Toolbar))
+            e.Graphics.FillRectangle(background, e.Bounds);
+        var alignment = e.Header.TextAlign switch
+        {
+            HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
+            HorizontalAlignment.Right => TextFormatFlags.Right,
+            _ => TextFormatFlags.Left
+        };
+        var bounds = Rectangle.Inflate(e.Bounds, -Theme.Px(7), 0);
+        TextRenderer.DrawText(e.Graphics, e.Header.Text, list.Font, bounds, Theme.Muted,
+            alignment | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+        using var divider = new Pen(Theme.Border);
+        e.Graphics.DrawLine(divider, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+    }
+
+    private static void DrawListViewItem(object? sender, DrawListViewItemEventArgs e)
+    {
+        if (sender is not ListView list || list.View == View.Details) return;
+        var selected = e.Item.Selected;
+        using (var brush = new SolidBrush(selected ? Theme.Selection : Theme.Viewport))
+            e.Graphics.FillRectangle(brush, e.Bounds);
+        var color = selected ? Theme.TextStrong : IsReadableOnDarkSurface(e.Item.ForeColor) ? e.Item.ForeColor : Theme.Text;
+        TextRenderer.DrawText(e.Graphics, e.Item.Text, list.Font, Rectangle.Inflate(e.Bounds, -Theme.Px(5), 0), color,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+        if (selected) e.DrawFocusRectangle();
+    }
+
+    private static void DrawListViewSubItem(object? sender, DrawListViewSubItemEventArgs e)
+    {
+        if (sender is not ListView list) return;
+        var selected = e.Item.Selected;
+        var background = selected
+            ? Theme.Selection
+            : e.ItemIndex % 2 == 0 ? Theme.Viewport : Theme.Blend(Theme.Viewport, Theme.Panel, .38f);
+        using (var brush = new SolidBrush(background)) e.Graphics.FillRectangle(brush, e.Bounds);
+
+        var color = Theme.Text;
+        if (!selected)
+        {
+            if (IsReadableOnDarkSurface(e.SubItem.ForeColor)) color = e.SubItem.ForeColor;
+            else if (IsReadableOnDarkSurface(e.Item.ForeColor)) color = e.Item.ForeColor;
+        }
+        var alignment = e.Header.TextAlign switch
+        {
+            HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
+            HorizontalAlignment.Right => TextFormatFlags.Right,
+            _ => TextFormatFlags.Left
+        };
+        var bounds = Rectangle.Inflate(e.Bounds, -Theme.Px(6), 0);
+        TextRenderer.DrawText(e.Graphics, e.SubItem.Text, list.Font, bounds, selected ? Theme.TextStrong : color,
+            alignment | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+    }
+
+    private static void DrawComboBoxItem(object? sender, DrawItemEventArgs e)
+    {
+        if (sender is not ComboBox combo || e.Index < -1) return;
+        var selected = (e.State & DrawItemState.Selected) != 0;
+        using (var brush = new SolidBrush(selected ? Theme.Selection : Theme.Viewport))
+            e.Graphics.FillRectangle(brush, e.Bounds);
+        var text = e.Index >= 0 ? combo.GetItemText(combo.Items[e.Index]) : combo.Text;
+        TextRenderer.DrawText(e.Graphics, text, combo.Font, Rectangle.Inflate(e.Bounds, -Theme.Px(6), 0),
+            selected ? Theme.TextStrong : Theme.Text,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+        if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
     }
 
     /// <summary>Styles a tab page and its nesting for owner-drawn tab controls.</summary>
