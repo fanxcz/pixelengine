@@ -9,13 +9,16 @@
     <RootNamespace>PixelFightEditor</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <!-- PixelFight already exports the shared avatar.png and world.lic through
-         its project reference. Re-declaring them here creates NETSDK1152 when
-         the legacy editor is published because both paths are identical. -->
     <ProjectReference Include="..\PixelFight\PixelFight.csproj">
-      <!-- Editor ships its own avatar.png and world.lic. Suppress only the referenced
-           project's duplicate content while keeping the shared PixelFight assembly. -->
+      <!-- The editor copies its own resource files below. Suppress transitive copies
+           from PixelFight to avoid NETSDK1152 duplicate publish paths. -->
       <AdditionalProperties>PixelFightIncludeContent=false</AdditionalProperties>
     </ProjectReference>
+    <Content Include="avatar.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="world.lic">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>
