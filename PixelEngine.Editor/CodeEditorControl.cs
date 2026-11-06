@@ -28,7 +28,8 @@ internal sealed class CodeEditorControl : UserControl
     private readonly Panel _findPanel = new();
     private readonly ListBox _completionList = new() { BorderStyle = BorderStyle.None, IntegralHeight = false, TabStop = true, Width = 310, Height = 205, DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 22 };
     private readonly ToolStripDropDown _completionPopup = new() { AutoClose = false, Padding = Padding.Empty, Margin = Padding.Empty };
-    private readonly System.Windows.Forms.Timer _highlightTimer = new() { Interval = 220 };
+    private readonly System.Windows.Forms.Timer _highlightTimer = new() { Interval = 180 };
+    private readonly System.Windows.Forms.Timer _outlineTimer = new() { Interval = 350 };
     private readonly HashSet<int> _bookmarks = new();
     private readonly Dictionary<int, string> _diagnosticLines = new();
     private string[] _projectCompletions = Array.Empty<string>();
@@ -154,7 +155,11 @@ internal sealed class CodeEditorControl : UserControl
             _gutter.Invalidate();
             if ((ModifierKeys & Keys.Control) == Keys.Control) ChangeFontSize(e.Delta > 0 ? 1f : -1f);
         };
-        _editor.Scrolled += (_, _) => _gutter.Invalidate();
+        _editor.Scrolled += (_, _) =>
+        {
+            _gutter.Invalidate();
+            ScheduleHighlight();
+        };
         _editor.KeyUp += (_, _) => _gutter.Invalidate();
         _editor.Resize += (_, _) => _gutter.Invalidate();
         _editor.KeyDown += EditorKeyDown;
@@ -210,6 +215,11 @@ internal sealed class CodeEditorControl : UserControl
         {
             _highlightTimer.Stop();
             HighlightSyntax();
+        };
+        _outlineTimer.Tick += (_, _) =>
+        {
+            _outlineTimer.Stop();
+            RebuildOutline();
         };
         _findBox.KeyDown += (_, e) =>
         {
@@ -1212,6 +1222,14 @@ internal sealed class CodeEditorControl : UserControl
 
     private void UpdateOutline()
     {
+        if (IsDisposed) return;
+        _outlineTimer.Stop();
+        _outlineTimer.Start();
+    }
+
+    private void RebuildOutline()
+    {
+        if (_editor.IsDisposed || _outlineSelector.IsDisposed) return;
         var previous = _outlineSelector.SelectedItem as OutlineEntry;
         _outlineSelector.BeginUpdate();
         _outlineSelector.Items.Clear();
@@ -1254,28 +1272,39 @@ internal sealed class CodeEditorControl : UserControl
 
     private void HighlightSyntax()
     {
-        if (_highlighting || _editor.IsDisposed) return;
-        _highlighting = true;
+        if (_highlighting || _editor.IsDisposed || _editor.TextLength == 0 ||
+            _editor.ClientSize.Width <= 0 || _editor.ClientSize.Height <= 0) return;
+
+        // RichTextBox formats text by sending native selection/format messages. Selecting each
+        // token in a large script thousands of times on the UI thread makes the whole window
+        // appear frozen and repeatedly scrolls the document. Only format complete lines currently
+        // visible in the viewport; scrolling schedules the next small formatting pass.
         var text = _editor.Text;
+        var firstVisible = _editor.GetCharIndexFromPosition(new Point(1, 1));
+        var lastVisible = _editor.GetCharIndexFromPosition(new Point(
+            Math.Max(1, _editor.ClientSize.Width - 2),
+            Math.Max(1, _editor.ClientSize.Height - 2)));
+        var (rangeStart, rangeLength) = GetVisibleTextRange(text, firstVisible, lastVisible);
+        if (rangeLength <= 0) return;
+
+        _highlighting = true;
         var selectionStart = _editor.SelectionStart;
         var selectionLength = _editor.SelectionLength;
-        var topChar = _editor.GetCharIndexFromPosition(new Point(2, 2));
-        var topLine = topChar >= 0 ? _editor.GetLineFromCharIndex(topChar) : 0;
+        var visibleText = text.Substring(rangeStart, rangeLength);
         try
         {
-            _editor.SelectAll();
+            _editor.Select(rangeStart, rangeLength);
             _editor.SelectionColor = Color.FromArgb(220, 225, 235);
             _editor.SelectionBackColor = Theme.Viewport;
-            ApplyColor(text, _language == "lua" ? @"\b(and|break|do|else|elseif|end|false|for|function|if|in|local|nil|not|or|repeat|return|then|true|until|while)\b" : @"\b(abstract|as|base|bool|break|byte|case|catch|char|class|const|continue|decimal|default|do|double|else|enum|event|explicit|extern|false|finally|fixed|float|for|foreach|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|stackalloc|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|var|virtual|void|volatile|while)\b", Color.FromArgb(105, 165, 245));
-            ApplyColor(text, @"\b\d+(?:\.\d+)?\b", Color.FromArgb(185, 145, 235));
-            ApplyColor(text, "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'", Color.FromArgb(220, 170, 115));
-            ApplyColor(text, _language == "lua" ? @"\bfunction\s+([A-Za-z_][\w\.]*)" : @"\b([A-Za-z_][\w]*)\s*(?=\()", Color.FromArgb(105, 205, 170));
-            ApplyColor(text, _language == "lua" ? @"--[^\r\n]*" : @"//[^\r\n]*|/\*[\s\S]*?\*/", Color.FromArgb(125, 145, 135));
-            _editor.Select(Math.Clamp(selectionStart, 0, _editor.TextLength), Math.Clamp(selectionLength, 0, Math.Max(0, _editor.TextLength - selectionStart)));
-            _editor.SelectionColor = Color.FromArgb(220, 225, 235);
-            var topIndex = _editor.GetFirstCharIndexFromLine(Math.Clamp(topLine, 0, Math.Max(0, _editor.Lines.Length - 1)));
-            if (topIndex >= 0) _editor.Select(topIndex, 0);
-            _editor.Select(Math.Clamp(selectionStart, 0, _editor.TextLength), Math.Clamp(selectionLength, 0, Math.Max(0, _editor.TextLength - selectionStart)));
+            ApplyColor(visibleText, _language == "lua" ? @"\b(and|break|do|else|elseif|end|false|for|function|if|in|local|nil|not|or|repeat|return|then|true|until|while)\b" : @"\b(abstract|as|base|bool|break|byte|case|catch|char|class|const|continue|decimal|default|do|double|else|enum|event|explicit|extern|false|finally|fixed|float|for|foreach|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|stackalloc|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|var|virtual|void|volatile|while)\b", Color.FromArgb(105, 165, 245), rangeStart);
+            ApplyColor(visibleText, @"\b\d+(?:\.\d+)?\b", Color.FromArgb(185, 145, 235), rangeStart);
+            ApplyColor(visibleText, "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'", Color.FromArgb(220, 170, 115), rangeStart);
+            ApplyColor(visibleText, _language == "lua" ? @"\bfunction\s+([A-Za-z_][\w\.]*)" : @"\b([A-Za-z_][\w]*)\s*(?=\()", Color.FromArgb(105, 205, 170), rangeStart);
+            ApplyColor(visibleText, _language == "lua" ? @"--[^\r\n]*" : @"//[^\r\n]*|/\*[\s\S]*?\*/", Color.FromArgb(125, 145, 135), rangeStart);
+
+            var safeSelectionStart = Math.Clamp(selectionStart, 0, _editor.TextLength);
+            var safeSelectionLength = Math.Clamp(selectionLength, 0, Math.Max(0, _editor.TextLength - safeSelectionStart));
+            _editor.Select(safeSelectionStart, safeSelectionLength);
         }
         finally
         {
@@ -1286,12 +1315,27 @@ internal sealed class CodeEditorControl : UserControl
         }
     }
 
-    private void ApplyColor(string text, string pattern, Color color)
+    // Kept pure so viewport-range behaviour is covered by the headless editor tests.
+    internal static (int Start, int Length) GetVisibleTextRange(string text, int firstVisibleChar, int lastVisibleChar)
+    {
+        if (string.IsNullOrEmpty(text)) return (0, 0);
+
+        var first = Math.Clamp(firstVisibleChar, 0, text.Length - 1);
+        var last = Math.Clamp(lastVisibleChar, first, text.Length - 1);
+        var start = text.LastIndexOf('\n', first);
+        start = start < 0 ? 0 : start + 1;
+
+        var end = text.IndexOf('\n', last);
+        end = end < 0 ? text.Length : end + 1;
+        return (start, Math.Max(0, end - start));
+    }
+
+    private void ApplyColor(string text, string pattern, Color color, int offset)
     {
         foreach (Match match in Regex.Matches(text, pattern, RegexOptions.Multiline | RegexOptions.CultureInvariant))
         {
-            if (match.Length == 0 || match.Index + match.Length > _editor.TextLength) continue;
-            _editor.Select(match.Index, match.Length);
+            if (match.Length == 0 || match.Index + match.Length > text.Length) continue;
+            _editor.Select(offset + match.Index, match.Length);
             _editor.SelectionColor = color;
         }
     }
@@ -1311,6 +1355,7 @@ internal sealed class CodeEditorControl : UserControl
         if (disposing)
         {
             _highlightTimer.Dispose();
+            _outlineTimer.Dispose();
             _completionPopup.Dispose();
         }
         base.Dispose(disposing);
