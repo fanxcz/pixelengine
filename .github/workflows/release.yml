@@ -18,7 +18,17 @@ env:
 
 jobs:
   build-test-package:
-    if: "github.repository == 'fanxcz/pixelengine' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.head_commit.message == 'release: v2.0.0-preview.4'))"
+    if: >-
+      github.repository == 'fanxcz/pixelengine' &&
+      (
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.ref == 'refs/heads/main' &&
+          github.event_name == 'push' &&
+          startsWith(github.event.head_commit.message, 'release: v')
+        )
+      )
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -35,6 +45,43 @@ jobs:
       - name: Restore solution
         shell: pwsh
         run: dotnet restore .\PixelEngine.sln
+
+      - name: Validate website and bundled game sources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $siteRoot = Join-Path (Get-Location).Path 'docs'
+          $siteIndex = Join-Path $siteRoot 'index.html'
+          $html = Get-Content -LiteralPath $siteIndex -Raw
+          $references = [regex]::Matches($html, '(?i)(?:href|src)="([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
+          foreach ($reference in $references) {
+            if ($reference -match '^(#|https?://|mailto:|data:)') { continue }
+            $localPath = [uri]::UnescapeDataString(($reference -split '[?#]', 2)[0])
+            $resolvedPath = Join-Path $siteRoot $localPath
+            if (-not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+              throw "Website references a missing local file: $reference"
+            }
+          }
+
+          foreach ($required in @('style.css', 'favicon.svg', 'sitemap.xml', 'robots.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $siteRoot $required) -PathType Leaf)) {
+              throw "Website asset is missing: $required"
+            }
+          }
+
+          $licRoots = @('Lic', 'Games') | ForEach-Object { Join-Path (Get-Location).Path $_ }
+          $projects = @($licRoots | Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter '*.lic' -File -Recurse })
+          if ($projects.Count -lt 9) {
+            throw "Expected at least 9 bundled LIC projects (Lic samples + Ashfall); found $($projects.Count)."
+          }
+
+          $ashfallRoot = Join-Path (Get-Location).Path 'Games\Ashfall'
+          foreach ($required in @('Ashfall.lic', 'Game\game.lua', 'Assets', 'README.md')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $ashfallRoot $required))) {
+              throw "Ashfall project file is missing: $required"
+            }
+          }
+          Write-Host "Validated $($references.Count) website references and $($projects.Count) bundled LIC projects."
 
       - name: Build Release
         shell: pwsh
@@ -82,7 +129,10 @@ jobs:
           $siteIndex = Join-Path (Get-Location).Path 'docs\index.html'
           $siteStyles = Join-Path (Get-Location).Path 'docs\style.css'
           $licenseFile = Join-Path (Get-Location).Path 'LICENSE'
-          foreach ($required in @($editorExe, $playerExe, $demoFile, $siteIndex, $siteStyles, $licenseFile)) {
+          $gamesDir = Join-Path (Get-Location).Path 'Games'
+          $ashfallProject = Join-Path $gamesDir 'Ashfall\Ashfall.lic'
+          $ashfallLua = Join-Path $gamesDir 'Ashfall\Game\game.lua'
+          foreach ($required in @($editorExe, $playerExe, $demoFile, $siteIndex, $siteStyles, $licenseFile, $ashfallProject, $ashfallLua)) {
             if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
               throw "Required release file is missing: $required"
             }
@@ -101,16 +151,29 @@ jobs:
           }
           Write-Host "Packaged SDL runtime: $($packagedSdl.FullName)"
           Copy-Item -LiteralPath $licDir -Destination (Join-Path $packageDir 'Lic') -Recurse
+          Copy-Item -LiteralPath $gamesDir -Destination (Join-Path $packageDir 'Games') -Recurse
           Copy-Item -LiteralPath 'docs' -Destination (Join-Path $packageDir 'Website') -Recurse
           Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $packageDir 'README.md')
           Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $packageDir 'LICENSE')
           Copy-Item -LiteralPath 'RELEASE-README.txt' -Destination (Join-Path $packageDir 'README.txt')
-          Copy-Item -LiteralPath 'RELEASE-NOTES-v2.0.0-preview.4.md' -Destination (Join-Path $packageDir 'RELEASE-NOTES.md')
+          Copy-Item -LiteralPath 'RELEASE-NOTES-v2.0.0-preview.5.md' -Destination (Join-Path $packageDir 'RELEASE-NOTES.md')
+
+          $packagedProjects = @(Get-ChildItem -LiteralPath $packageDir -Filter '*.lic' -File -Recurse)
+          if ($packagedProjects.Count -lt 9) {
+            throw "The release ZIP must include all built-in LIC projects and Ashfall; found $($packagedProjects.Count)."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $packageDir 'Games\Ashfall\Game\game.lua') -PathType Leaf)) {
+            throw "Ashfall Lua source was not copied into the release ZIP."
+          }
+          if (-not (Get-ChildItem -LiteralPath (Join-Path $packageDir 'Games\Ashfall\Assets') -File | Select-Object -First 1)) {
+            throw "Ashfall Assets were not copied into the release ZIP."
+          }
+          Write-Host "Release contains $($packagedProjects.Count) LIC projects plus Ashfall source and assets."
 
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $version = $env:GITHUB_REF_NAME
-          } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:HEAD_COMMIT_MESSAGE -eq 'release: v2.0.0-preview.4') {
-            $version = 'v2.0.0-preview.4'
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:HEAD_COMMIT_MESSAGE.StartsWith('release: v', [StringComparison]::Ordinal)) {
+            $version = $env:HEAD_COMMIT_MESSAGE.Substring('release: '.Length).Trim()
           } else {
             $version = 'preview-' + $env:GITHUB_SHA.Substring(0, 7)
           }
@@ -139,13 +202,19 @@ jobs:
           retention-days: 30
 
       - name: Publish GitHub Release
-        if: "startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.head_commit.message == 'release: v2.0.0-preview.4')"
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') ||
+          (
+            github.ref == 'refs/heads/main' &&
+            github.event_name == 'push' &&
+            startsWith(github.event.head_commit.message, 'release: v')
+          )
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.package.outputs.version }}
           target_commitish: ${{ github.sha }}
           name: PixelEngine ${{ steps.package.outputs.version }}
-          body_path: RELEASE-NOTES-v2.0.0-preview.4.md
+          body_path: RELEASE-NOTES-v2.0.0-preview.5.md
           prerelease: ${{ contains(steps.package.outputs.version, '-') }}
           make_latest: ${{ !contains(steps.package.outputs.version, '-') }}
           files: |
