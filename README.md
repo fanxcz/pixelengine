@@ -1,94 +1,105 @@
 # PixelEngine 2.0
 
-**PixelEngine** — 2D game engine with a Windows Studio editor, a separate MonoGame player and editable LIC projects. The repository includes the engine, authoring environment, sample projects and automated checks.
+**PixelEngine** — открытый 2D-движок с Windows Studio, отдельным MonoGame Player и проектами в формате `.lic`. В репозитории находятся исходники движка, редактор, игровые примеры и тесты.
 
-[Сайт проекта](https://fanxcz.github.io/pixelengine/) · [Скачать релиз](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.4) · [Исходный код](https://github.com/fanxcz/pixelengine)
+[Сайт](https://fanxcz.github.io/pixelengine/) · [Релизы](https://github.com/fanxcz/pixelengine/releases) · [Исходный код](https://github.com/fanxcz/pixelengine) · [MIT License](LICENSE)
 
-> **Текущая версия:** v2.0.0-preview.4 — предварительная сборка для Windows x64. Это preview, а не заявление о завершённом 3D-движке или полном паритете со старой игрой.
+> **Текущая версия:** v2.0.0-preview.5 для Windows x64. Это предварительная сборка. CI подтверждает компиляцию и автоматические проверки, но не заменяет проверку графического запуска на конкретном компьютере.
 
 ## Скачать и запустить
 
-1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases/tag/v2.0.0-preview.4) и скачайте архив PixelEngine-v2.0.0-preview.4-win-x64.zip.
-2. Распакуйте архив целиком в отдельную папку. Не удаляйте каталог Lic: в нём лежат демонстрационные проекты.
-3. Запустите PixelEngine.Editor.exe. При первом старте редактор автоматически откроет Lic/demo.lic.
-4. Нажмите **F5**, чтобы запустить игру в отдельном окне. **Shift+F5** останавливает Player. Полная версия статического сайта проекта также включена в архив в каталоге `Website/`.
+1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases) и скачайте `PixelEngine-v2.0.0-preview.5-win-x64.zip`.
+2. Распакуйте архив целиком в отдельную папку. Не удаляйте `Lic/`, `Games/` или `Player/`.
+3. Запустите `PixelEngine.Editor.exe`. По умолчанию откроется `Lic/demo.lic`.
+4. Нажмите **F5**, чтобы запустить Player в отдельном окне; **Shift+F5** останавливает его.
 
-Релизный архив содержит self-contained сборки .NET 8: устанавливать .NET SDK на компьютере, где запускается готовый пакет, не требуется. Полная папка `Player/` содержит исполняемый файл MonoGame и необходимые ему библиотеки SDL/OpenAL — не перемещайте `PixelEngine.Sandbox.exe` отдельно от этой папки. Для Player нужны Windows x64 и совместимый графический драйвер/OpenGL.
+Готовый архив включает self-contained .NET 8 сборки: устанавливать .NET SDK для запуска пакета не требуется. `Player/` содержит исполняемый файл и нативные библиотеки MonoGame/SDL/OpenAL. Не перемещайте `PixelEngine.Sandbox.exe` отдельно от этой папки. Требуются Windows x64 и совместимый графический драйвер с поддержкой OpenGL.
 
-## Что входит в PixelEngine 2.0
+## Примеры и игры
 
-### Studio — редактор проектов
+В релизный архив входят все `.lic`-проекты из `Lic/` и полный каталог `Games/` с исходниками и ресурсами Ashfall.
 
-- Тёмный интерфейс с док-панелями Scene, Scripts, Prefabs, Search, FileSystem, Inspector, Node, Signals, Output, Problems и Terminal.
-- 2D Scene View: выбор и перемещение объектов, сетка, snapping, zoom/pan, коллайдеры и подписи.
-- Редактор скриптов с вкладками, подсветкой Lua/C#, автопарными скобками, поиском, переходом к строке, bookmarks и API-подсказками.
-- Prefabs и компоненты: создание, дублирование, применение и возврат шаблонов; редактирование SpriteRenderer, Rigidbody2D, Box/CircleCollider2D, AudioSource, Animator и Script metadata.
-- Импорт PNG/WAV, предпросмотр ресурсов и проверка ссылок через Diagnostics.
-- Undo/Redo, Command Palette (Ctrl+Shift+P), Quick Open (Ctrl+P) и сохраняемые настройки редактора.
-- Встроенный терминал PowerShell/CMD с историей, выводом stdout/stderr и остановкой процесса.
+| Проект | Назначение |
+|---|---|
+| `Lic/demo.lic` | Стартовая сцена, открывается по умолчанию |
+| `Lic/knights.lic` | Игровой пример Knights |
+| `Lic/merchant.lic` | Игровой пример Merchant |
+| `Lic/strategy.lic` | Стратегический пример |
+| `Lic/tower.lic` | Tower Defense |
+| `Lic/stage8-showcase.lic` | Showcase возможностей Stage 8 |
+| `Lic/stage10-showcase.lic` | Showcase возможностей Stage 10 |
+| `Lic/world.lic` | Большой тестовый игровой проект |
+| `Games/Ashfall/Ashfall.lic` | ASHFALL: The Last Beacon — top-down arena survival |
 
-### Runtime — запуск 2D-проектов
+У Ashfall также сохранены `Game/game.lua`, каталог `Assets/`, `Preview.png`, README и запись о валидации. Откройте `Games/Ashfall/Ashfall.lic` через **File → Open** в Studio. Управление и описание игры находятся в [`Games/Ashfall/README.md`](Games/Ashfall/README.md).
 
-- MonoGame DesktopGL, отдельное окно Player и загрузка сцен из LIC.
-- 2D-компоненты, физика, столкновения и триггеры, камера, TileMap, анимация трансформаций и sprite sheets.
+## Возможности Studio
+
+- Иерархия сцены, 2D Scene View, сетка, snapping, zoom/pan и выбор объектов.
+- Inspector и редактор компонентов, Prefabs, FileSystem и Asset Browser.
+- Редактор Lua/C# с вкладками, подсветкой, поиском, переходом к строке, bookmarks и подсказками API.
+- Undo/Redo, Command Palette (`Ctrl+Shift+P`), Quick Open (`Ctrl+P`) и сохраняемые настройки.
+- Output, Problems и встроенный PowerShell/CMD терминал.
+- Диагностика проекта и отображение ошибок сборки.
+
+## Runtime
+
+- MonoGame DesktopGL и отдельное окно Player.
+- Сцены, объекты и компоненты, 2D-камера, физика, коллизии и триггеры.
+- TileMap, анимации, sprite sheets, частицы и 2D-освещение.
 - WAV-аудио, AudioSource и базовый микшер.
-- Lua-скрипты выполняются через MoonSharp с ограниченной конфигурацией SoftSandbox.
+- Lua выполняется через MoonSharp SoftSandbox.
 
-## Пример проекта и команды
+**Ограничения текущей версии:** runtime ориентирован на 2D. C#-скрипты можно хранить и редактировать в Studio, но Player пока их не исполняет. Полноценные 3D, hot reload C# и интерактивный debugger пока не заявляются.
 
-В архиве есть демонстрационный проект Lic/demo.lic. Для разработки из исходников на Windows:
+## Сборка из исходников
 
-**Требования:** .NET 8 SDK, доступ к NuGet и графическая среда для запуска MonoGame Player.
+**Требования:** Windows, .NET 8 SDK, доступ к NuGet. Для запуска Player нужна графическая среда с совместимым OpenGL.
 
-    git clone https://github.com/fanxcz/pixelengine.git
-    cd pixelengine
-    dotnet restore .\PixelEngine.sln
-    dotnet build .\PixelEngine.sln -c Release
+```powershell
+git clone https://github.com/fanxcz/pixelengine.git
+cd pixelengine
+dotnet restore .\PixelEngine.sln
+dotnet build .\PixelEngine.sln -c Release
 
-    # Smoke/regression checks
-    dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Release -- .
-    dotnet run --project .\PixelEngine.Editor.Tests\PixelEngine.Editor.Tests.csproj -c Release
+# Runtime smoke/regression checks
+dotnet run --project .\PixelEngine.SmokeTests\PixelEngine.SmokeTests.csproj -c Release -- .
 
-    # Launch Studio
-    dotnet run --project .\PixelEngine.Editor\PixelEngine.Editor.csproj -c Debug
+# Editor headless tests
+dotnet run --project .\PixelEngine.Editor.Tests\PixelEngine.Editor.Tests.csproj -c Release
 
-Или откройте решение PixelEngine.sln в Visual Studio 2022 с поддержкой .NET 8. Для запуска демонстрационной игры из исходников используйте Run-Demo-Game.cmd.
+# Studio
+dotnet run --project .\PixelEngine.Editor\PixelEngine.Editor.csproj -c Debug
 
-## Формат проектов и скрипты
+# Ashfall Player
+dotnet run --project .\PixelEngine.Sandbox\PixelEngine.Sandbox.csproj -c Debug -- ".\Games\Ashfall\Ashfall.lic"
+```
 
-Проект хранится в JSON-формате LIC: сцены, объекты, компоненты, скрипты и встроенные ресурсы. Lua-код запускается в Player через MoonSharp. C#-скрипты можно хранить и редактировать в Studio, но в текущем runtime они **не исполняются**. Это ограничение текущей версии, а не поддержка полноценного C# hot reload.
-
-## Ограничения preview
-
-- Studio и готовый релизный комплект предназначены для **Windows x64**. Studio построена на WinForms.
-- Текущий runtime — **2D**. Режим 3D в интерфейсе пока отключён.
-- C#-скрипты остаются исходным текстом и не исполняются; отладчик, LSP и hot reload не заявляются.
-- Встроенный терминал поддерживает обычную интерактивную работу, но не является полной реализацией VT100/ANSI и не предназначен для полноэкранных консольных программ.
-- Автоматические проверки собирают проект и тестируют невизуальную логику. Они не заменяют ручную проверку окна редактора, драйверов и графического рендеринга на целевой машине.
-
-Ошибки запуска записываются в %LOCALAPPDATA%\PixelEngine\Logs\editor-startup.log и player-startup.log.
+Или откройте `PixelEngine.sln` в Visual Studio 2022 с поддержкой .NET 8.
 
 ## Структура репозитория
 
 | Каталог | Назначение |
 |---|---|
-| PixelEngine.Core/ | Движок, сцены, рендеринг, физика, аудио, сериализация и Lua |
-| PixelEngine.Editor/ | WinForms Studio |
-| PixelEngine.Sandbox/ | MonoGame Player для LIC |
-| PixelEngine.SmokeTests/ | Smoke/regression checks runtime |
-| PixelEngine.Editor.Tests/ | Headless проверки логики редактора |
-| Lic/ | Примеры и тестовые проекты |
-| docs/ | Сайт проекта |
-| .github/workflows/ | CI, сборка релизного архива и GitHub Pages |
+| `PixelEngine.Core/` | Runtime, сцены, рендеринг, физика, аудио, сериализация и Lua |
+| `PixelEngine.Editor/` | Windows Studio |
+| `PixelEngine.Sandbox/` | Отдельный MonoGame Player |
+| `PixelEngine.SmokeTests/` | Runtime smoke/regression checks |
+| `PixelEngine.Editor.Tests/` | Headless проверки логики редактора |
+| `Lic/` | LIC-примеры и тестовые проекты |
+| `Games/` | Игры с исходниками и ресурсами, включая Ashfall |
+| `PixelFight*` | Исходники предыдущего PixelFight-приложения |
+| `docs/` | Статический сайт |
+| `.github/workflows/` | CI, релизная сборка и публикация Pages |
 
-## Отчёты об ошибках
+## Разработка и лицензия
 
-Создайте [Issue в GitHub](https://github.com/fanxcz/pixelengine/issues) и приложите шаги воспроизведения, версию Windows, имя проекта и релевантный фрагмент лога. Не прикладывайте приватные проекты или секретные данные без необходимости.
+PixelEngine распространяется по лицензии **MIT**. Вы можете создавать форки, изменять исходники, выпускать собственные версии и использовать проект в коммерческих продуктах. При распространении необходимо сохранять уведомление об авторских правах и текст лицензии.
 
-## Вклад, форки и лицензия
+Полный текст: [`LICENSE`](LICENSE).
 
-PixelEngine распространяется по лицензии **MIT**. Вы можете свободно форкать репозиторий, изучать и изменять исходный код, создавать собственные версии, публиковать и распространять изменённые сборки, а также использовать проект в коммерческих продуктах. При распространении необходимо сохранить уведомление об авторских правах и текст лицензии.
+Чтобы предложить изменение, создайте Fork, внесите правки в отдельную ветку и откройте Pull Request. Убедитесь, что разрешено распространять добавленные изображения, звуки, шрифты и другие сторонние материалы: сторонние зависимости могут иметь отдельные лицензии.
 
-Полный текст: [LICENSE](LICENSE).
+## Сообщить об ошибке
 
-Чтобы предложить улучшения: создайте Fork, внесите изменения в отдельную ветку и откройте Pull Request. Перед публикацией проверьте, что добавленные вами изображения, аудио, шрифты и другие сторонние материалы разрешено распространять. Внешние зависимости сохраняют собственные лицензии и условия.
+Создайте [Issue](https://github.com/fanxcz/pixelengine/issues) с версией PixelEngine, версией Windows, шагами воспроизведения и релевантным фрагментом лога. Логи редактора и Player находятся в `%LOCALAPPDATA%\PixelEngine\Logs\`. Не прикладывайте приватные проекты или секретные данные без необходимости.
