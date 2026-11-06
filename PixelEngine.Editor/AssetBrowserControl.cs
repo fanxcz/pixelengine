@@ -46,7 +46,7 @@ internal sealed class AssetBrowserControl : UserControl
 
         // Compact two-row FileSystem toolbar: filters remain visible in a narrow dock,
         // while asset actions scroll horizontally instead of wrapping into tall stacks.
-        var toolbar = new Panel { Dock = DockStyle.Top, Height = Theme.Px(68), BackColor = Theme.Toolbar };
+        var toolbar = new Panel { Dock = DockStyle.Top, Height = Theme.Px(94), BackColor = Theme.Toolbar };
         var filters = new FlowLayoutPanel
         {
             Dock = DockStyle.Top, Height = Theme.Px(33), Padding = new Padding(Theme.Px(5), Theme.Px(3), Theme.Px(3), Theme.Px(1)),
@@ -54,8 +54,8 @@ internal sealed class AssetBrowserControl : UserControl
         };
         var actions = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top, Height = Theme.Px(36), Padding = new Padding(Theme.Px(4), Theme.Px(1), Theme.Px(3), Theme.Px(1)),
-            BackColor = Theme.Toolbar, WrapContents = false, AutoScroll = true
+            Dock = DockStyle.Top, Height = Theme.Px(60), Padding = new Padding(Theme.Px(4), Theme.Px(1), Theme.Px(3), Theme.Px(1)),
+            BackColor = Theme.Toolbar, WrapContents = true, AutoScroll = true
         };
         var searchLabel = new Label { Text = "Filter", AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(2, 5, 2, 0) };
         _search.BackColor = Theme.Viewport;
@@ -69,9 +69,16 @@ internal sealed class AssetBrowserControl : UserControl
         filters.Controls.Add(_usedOnly);
         foreach (var button in new[] { _import, _rename, _assign, _export, _playAudio, _stopAudio, _remove })
         {
-            button.Height = Theme.Px(28);
+            button.Height = Theme.Px(26);
+            button.Width = Theme.Px(button.Text switch
+            {
+                "Assign to selected" => 104,
+                "▶ Play WAV" => 82,
+                "■ Stop" => 58,
+                _ => 66
+            });
             button.Margin = new Padding(Theme.Px(2), Theme.Px(1), Theme.Px(2), Theme.Px(1));
-            button.Padding = new Padding(Theme.Px(6), 0, Theme.Px(6), 0);
+            button.Padding = new Padding(Theme.Px(4), 0, Theme.Px(4), 0);
             actions.Controls.Add(button);
         }
         toolbar.Controls.Add(actions);
