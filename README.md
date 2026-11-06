@@ -4,11 +4,11 @@
 
 [Сайт](https://fanxcz.github.io/pixelengine/) · [Релизы](https://github.com/fanxcz/pixelengine/releases) · [Исходный код](https://github.com/fanxcz/pixelengine) · [MIT License](LICENSE)
 
-> **Текущая версия:** v2.0.0-preview.5 для Windows x64. Это предварительная сборка. CI подтверждает компиляцию и автоматические проверки, но не заменяет проверку графического запуска на конкретном компьютере.
+> **Текущая версия:** v2.0.0-preview.6 для Windows x64. Это предварительная сборка. CI подтверждает компиляцию и автоматические проверки, но не заменяет проверку графического запуска на конкретном компьютере.
 
 ## Скачать и запустить
 
-1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases) и скачайте `PixelEngine-v2.0.0-preview.5-win-x64.zip`.
+1. Откройте [страницу релизов](https://github.com/fanxcz/pixelengine/releases) и скачайте `PixelEngine-v2.0.0-preview.6-win-x64.zip`.
 2. Распакуйте архив целиком в отдельную папку. Не удаляйте `Lic/`, `Games/`, `Player/`, `PixelFight*/` или корневой `avatar.png`. Последние файлы относятся к исходной версии Bloody Pixels.
 3. Запустите `PixelEngine.Editor.exe`. По умолчанию откроется `Lic/demo.lic`.
 4. Нажмите **F5**, чтобы запустить Player в отдельном окне; **Shift+F5** останавливает его.
