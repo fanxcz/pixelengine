@@ -216,10 +216,13 @@ try
     {
         var package = Path.Combine(scratch, "release-package");
         var licDirectory = Path.Combine(package, "Lic");
+        var playerDirectory = Path.Combine(package, "Player");
         Directory.CreateDirectory(licDirectory);
+        Directory.CreateDirectory(playerDirectory);
         var demoPath = Path.Combine(licDirectory, "demo.lic");
         File.WriteAllText(demoPath, "{}");
-        File.WriteAllText(Path.Combine(package, "PixelEngine.Sandbox.exe"), "player");
+        File.WriteAllText(Path.Combine(playerDirectory, "PixelEngine.Sandbox.exe"), "player");
+        File.WriteAllText(Path.Combine(playerDirectory, "SDL2.dll"), "native SDL fixture");
 
         var resolvedProject = EditorLaunchPaths.ResolveInitialProject(
             Array.Empty<string>(), null, package, scratch);
@@ -227,8 +230,8 @@ try
             throw new InvalidOperationException("A packaged editor did not resolve Lic/demo.lic.");
 
         var playerPath = EditorLaunchPaths.FindBundledPlayer(package);
-        if (playerPath != Path.Combine(package, "PixelEngine.Sandbox.exe"))
-            throw new InvalidOperationException("A packaged editor did not find the adjacent Player executable.");
+        if (playerPath != Path.Combine(playerDirectory, "PixelEngine.Sandbox.exe"))
+            throw new InvalidOperationException("A packaged editor did not find Player/PixelEngine.Sandbox.exe.");
     });
 
     Check("explicit LIC command-line argument overrides the bundled demo", () =>
